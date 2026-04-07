@@ -27,7 +27,21 @@
     fit = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = weights)
 
     @test fit isa NCPLS.AbstractNCPLSFit
-    @test fit isa NCPLS.NCPLSFit{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}}
+    @test fit isa NCPLS.NCPLSFit
+    @test fit.model == model
+    @test size(fit.B) == (2, 2, 2)
+    @test size(fit.R) == (2, 2)
+    @test size(fit.T) == (4, 2)
+    @test size(fit.P) == (2, 2)
+    @test size(fit.Q) == (2, 2)
+    @test size(fit.W) == (2, 2)
+    @test size(fit.c) == (3, 2)
+    @test size(fit.W0) == (2, 3, 2)
+    @test length(fit.rho) == 2
+    @test size(fit.Yres) == size(Y)
+    @test vec(sum(fit.T .^ 2; dims = 1)) ≈ ones(2) atol = 1e-12
+    @test fit.R ≈ NCPLS.score_projection_tensors(fit.W, fit.P)
+    @test fit.B ≈ NCPLS.regression_coefficients(fit.R, fit.Q)
     @test fit.X_mean ≈ d.X_mean
     @test fit.X_std ≈ d.X_std
     @test fit.Yprim_mean ≈ d.Yprim_mean
@@ -59,7 +73,21 @@ end
     fit = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
 
     @test fit isa NCPLS.AbstractNCPLSFit
-    @test fit isa NCPLS.NCPLSFit{Float64, Matrix{Float64}, Vector{Float64}, Vector{Float64}}
+    @test fit isa NCPLS.NCPLSFit
+    @test fit.model == model
+    @test size(fit.B) == (3, 2, 3, 2)
+    @test size(fit.R) == (3, 2, 3)
+    @test size(fit.T) == (4, 3)
+    @test size(fit.P) == (3, 2, 3)
+    @test size(fit.Q) == (2, 3)
+    @test size(fit.W) == (3, 2, 3)
+    @test size(fit.c) == (3, 3)
+    @test size(fit.W0) == (3, 2, 3, 3)
+    @test length(fit.rho) == 3
+    @test size(fit.Yres) == size(Y)
+    @test vec(sum(fit.T .^ 2; dims = 1)) ≈ ones(3) atol = 1e-12
+    @test fit.R ≈ NCPLS.score_projection_tensors(fit.W, fit.P)
+    @test fit.B ≈ NCPLS.regression_coefficients(fit.R, fit.Q)
     @test size(fit.X_mean) == (3, 2)
     @test fit.X_mean ≈ d.X_mean
     @test fit.X_std ≈ d.X_std
@@ -124,7 +152,8 @@ end
         obs_weights = nothing,
     )
     @test fit_no_yadd isa NCPLS.AbstractNCPLSFit
-    @test fit_no_yadd isa NCPLS.NCPLSFit{Float64, Vector{Float64}, Vector{Float64}, Nothing}
+    @test fit_no_yadd isa NCPLS.NCPLSFit
+    @test size(fit_no_yadd.W0) == (2, 2, 2)
     @test fit_no_yadd.Yadd_mean === nothing
     @test fit_no_yadd.Yadd_std === nothing
 
@@ -165,4 +194,35 @@ end
     end
     @test err_yprim_yadd isa DimensionMismatch
     @test occursin("Yprim and Yadd must have the same number of rows", sprint(showerror, err_yprim_yadd))
+end
+
+@testset "fit surfaces the current multilinear not-implemented branch" begin
+    model = NCPLS.NCPLSModel(
+        ncomponents = 1,
+        center_X = true,
+        scale_X = false,
+        center_Yprim = true,
+        scale_Yprim = false,
+        center_Yadd = true,
+        scale_Yadd = false,
+        multilinear = true,
+    )
+    X = reshape(collect(1.0:24.0), 4, 3, 2)
+    Y = Float64[
+        1 0
+        0 1
+        1 0
+        0 1
+    ]
+    Yadd = reshape([1.0, 2.0, 3.0, 4.0], :, 1)
+
+    err = try
+        NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
+        nothing
+    catch err
+        err
+    end
+
+    @test err isa ArgumentError
+    @test occursin("Multilinear loading weights option is not yet implemented.", sprint(showerror, err))
 end

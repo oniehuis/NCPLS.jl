@@ -1,32 +1,168 @@
-using LinearAlgebra
-using Random
-
 function candidate_loading_weights(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real},
     obs_weights::Union{AbstractVector{<:Real}, Nothing}
 )
-
     n = size(X, 1)
     Xₘ = reshape(X, n, :)
-    W0mat = if isnothing(obs_weights)
+
+    W₀ₘ = if isnothing(obs_weights)
         Xₘ' * Y
     else
         w = reshape(float64(obs_weights), n, 1)
         (Xₘ .* w)' * Y
     end
 
-    predictor_dims = size(X)[2:end]
-    W₀ = reshape(W0mat, predictor_dims..., size(Y, 2))
+    reshape(W₀ₘ, size(X)[2:end]..., size(Y, 2))
+end
 
-    return (
-        W₀ = W₀,     # tensor-shaped candidate weights
-        W₀ₘ = W₀ₘ,   # unfolded matrix form, useful for Z0 = Xmat * W0mat
-        Y = Y,       # combined response block
-    )
+function candidate_scores(
+    X::AbstractArray{<:Real},
+    W₀::AbstractArray{<:Real},
+)
+    ndims(X) ≥ 2 || throw(ArgumentError(
+        "X must have at least 2 dimensions: samples × variables[/modes]"))
+
+    ndims(W₀) == ndims(X) || throw(DimensionMismatch(
+        "W₀ must have the same number of dimensions as X"))
+
+    size(W₀)[1:end-1] == size(X)[2:end] || throw(DimensionMismatch(
+        "Predictor dimensions of W₀ must match the non-sample dimensions of X"))
+
+    n = size(X, 1)
+    q = size(W₀, ndims(W₀))
+
+    Xₘ = reshape(X, n, :)
+    W₀ₘ = reshape(W₀, :, q)
+
+    Xₘ * W₀ₘ
+end
+
+function orthogonalize_on_accumulated_scores(
+    X::AbstractVecOrMat{Float64},
+    T_A::AbstractMatrix{Float64},
+)
+    size(T_A, 1) == size(X, 1) || throw(DimensionMismatch(
+        "T_A and X must have the same number of rows"))
+
+    size(T_A, 2) == 0 && return X
+
+    X - T_A * (T_A' * X)
 end
 
 
+function loading_weights(
+    W₀::AbstractArray{<:Real},
+    c::AbstractVector{<:Real},
+)
+
+    q = size(W₀, ndims(W₀))
+    q == length(c) || throw(DimensionMismatch(
+        "Length of c must match the last dimension of W₀"))
+
+    predictor_dims = size(W₀)[1:end-1]
+    W₀ₘ = reshape(W₀, :, q)
+    Wₘ = W₀ₘ * c
+    W = reshape(Wₘ, predictor_dims...)
+
+    nw = norm(W)
+    nw > 0 || throw(ArgumentError("Loading weights have zero norm"))
+
+    W ./ nw
+end
+
+function score_vector(
+    X::AbstractArray{<:Real},
+    Wᵒ::AbstractArray{<:Real},
+)
+    size(Wᵒ) == size(X)[2:end] || throw(DimensionMismatch(
+        "Dimensions of Wᵒ must match the non-sample dimensions of X"))
+
+    reshape(X, size(X, 1), :) * vec(Wᵒ)
+end
+
+function normalize_score_vector(
+    t::AbstractVector{Float64},
+)
+    t_norm = norm(t)
+    t_norm > 0 || throw(ArgumentError("Score vector has zero norm"))
+
+    t / t_norm
+end
+
+function loading_tensor(
+    X::AbstractArray{Float64},
+    t::AbstractVector{Float64},
+)
+    size(X, 1) == length(t) || throw(DimensionMismatch(
+        "Length of t must match size(X, 1)"))
+
+    Pₘ = reshape(X, size(X, 1), :)' * t
+    reshape(Pₘ, size(X)[2:end]...)
+end
+
+function response_loading_vector(
+    Yprim::AbstractMatrix{Float64},
+    t::AbstractVector{Float64},
+)
+    size(Yprim, 1) == length(t) || throw(DimensionMismatch(
+        "Length of t must match size(Yprim, 1)"))
+
+    Yprim' * t
+end
+
+function deflate_responses!(
+    Yprim::AbstractMatrix{Float64},
+    t::AbstractVector{Float64},
+    q::AbstractVector{Float64},
+)
+    size(Yprim, 1) == length(t) || throw(DimensionMismatch(
+        "Length of t must match size(Yprim, 1)"))
+    size(Yprim, 2) == length(q) || throw(DimensionMismatch(
+        "Length of q must match size(Yprim, 2)"))
+
+    Yprim .-= t * q'
+    Yprim
+end
+
+function score_projection_tensors(
+    W_A::AbstractArray{Float64},
+    P_A::AbstractArray{Float64},
+)
+    size(W_A) == size(P_A) || throw(DimensionMismatch(
+        "W_A and P_A must have the same dimensions"))
+
+    A = size(W_A, ndims(W_A))
+    W_Am = reshape(W_A, :, A)
+    P_Am = reshape(P_A, :, A)
+
+    M = P_Am' * W_Am
+    Rm = W_Am * inv(M)
+
+    reshape(Rm, size(W_A)...)
+end
+
+function regression_coefficients(
+    R::AbstractArray{Float64},
+    Q_A::AbstractMatrix{Float64},
+)
+    A = size(R, ndims(R))
+    size(Q_A, 2) == A || throw(DimensionMismatch(
+        "The number of columns in Q_A must match the component dimension of R"))
+
+    predictor_dims = size(R)[1:end-1]
+    M = size(Q_A, 1)
+
+    R_exp = reshape(R, predictor_dims..., A, 1)
+    Q_exp = reshape(
+        permutedims(Q_A),                      # A × M
+        ntuple(_ -> 1, length(predictor_dims))...,
+        A,
+        M,
+    )
+
+    cumsum(R_exp .* Q_exp; dims = length(predictor_dims) + 1)
+end
 
 
 # ------------------------------------------------------------

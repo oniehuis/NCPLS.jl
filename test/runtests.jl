@@ -5,9 +5,9 @@ using Test
     include(joinpath("NCPLS", "types.jl"))
 end
 
-# @testset "NCPLS/cca.jl" begin
-#     include(joinpath("NCPLS", "cca.jl"))
-# end
+@testset "NCPLS/cca.jl" begin
+    include(joinpath("NCPLS", "cca.jl"))
+end
 
 @testset "NCPLS/fit.jl" begin
     include(joinpath("NCPLS", "fit.jl"))

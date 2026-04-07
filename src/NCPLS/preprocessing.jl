@@ -21,7 +21,6 @@ function preprocess(
         centerscale(float64(Yprim), m.center_Yprim, m.scale_Yprim, obs_weights)
 
     if isnothing(Yadd)
-        Y = Yprim
         Yadd, Yadd_mean, Yadd_std = nothing, nothing, nothing
     else
         nrow_Yadd, _ = size(Yadd)
@@ -29,7 +28,6 @@ function preprocess(
             "Yprim and Yadd must have the same number of rows"))
         Yadd, Yadd_mean, Yadd_std = 
             centerscale(float64(Yadd), m.center_Yadd, m.scale_Yadd, obs_weights)
-        Y = hcat(Yprim, float64(Yadd))
     end
     
     (   # Preprocessed predictors
@@ -45,14 +43,7 @@ function preprocess(
         # Preprocessed additional responses
         Yadd=Yadd,
         Yadd_mean=Yadd_mean,
-        Yadd_std=Yadd_std, 
-      
-        # Preprocessed combined (Yprim and Yadd) responses
-        Y=Y, 
-      
-        # Dimensions
-        nrow_X=nrow_X, 
-        ncol_Y=size(Y, 2)
+        Yadd_std=Yadd_std
     )
 end
 

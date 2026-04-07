@@ -22,13 +22,77 @@ function fit_ncpls_core(
     d = preprocess(m, X, Yprim, Yadd, obs_weights)
 
     # Preallocate arrays for scores, loadings, regression coefficients, and diagnostics.
+    T = zeros(Float64, size(d.X, 1), m.ncomponents)
+    P = Array{Float64}(undef, size(d.X)[2:end]..., m.ncomponents)
+    Q = Matrix{Float64}(undef, size(d.Yprim, 2), m.ncomponents)
+    W_A = Array{Float64}(undef, size(d.X)[2:end]..., m.ncomponents)
+    q_comb = size(d.Yprim, 2) + (isnothing(d.Yadd) ? 0 : size(d.Yadd, 2))
+    W0 = Array{Float64}(undef, size(d.X)[2:end]..., q_comb, m.ncomponents)
+    c = Matrix{Float64}(undef, q_comb, m.ncomponents)
+    rho = Vector{Float64}(undef, m.ncomponents)
+
+    # Apply observation weights consistently with covariance weighting (sqrt for covariance).
+    cca_obs_weights = isnothing(obs_weights) ? nothing : sqrt.(obs_weights)
 
     # Main loop over components: compute weights, scores, loadings, deflate, and 
     # store results.
+    Y = copy(d.Yprim)
     for i = 1:m.ncomponents
-        # compute_ncpls_weights
+        Ycomb = isnothing(Yadd) ? Y : hcat(Y, d.Yadd)
 
+        W₀ = candidate_loading_weights(d.X, Ycomb, obs_weights)
+        selectdim(W0, ndims(W0), i) .= W₀
+        Z₀ = candidate_scores(d.X, W₀)
+        if !isnothing(d.Yadd)
+            Z₀ = orthogonalize_on_accumulated_scores(Z₀, T[:, 1:i-1])
+        end
+
+        C, _, rho[i] = cca_coeffs_and_corr(Z₀, Y, cca_obs_weights)
+        c[:, i] = C[:, 1]
+
+        W = loading_weights(W₀, c[:, i])
+
+        if m.multilinear
+            throw(ArgumentError("Multilinear loading weights option is not yet implemented."))
+        else
+            W⁰ = W
+        end
+
+        selectdim(W_A, ndims(W_A), i) .= W⁰
+
+        t = score_vector(d.X, W⁰)
+        t  = orthogonalize_on_accumulated_scores(t,  T[:, 1:i-1])
+        t = normalize_score_vector(t)
+        T[:, i] = t
+
+        Pᵢ = loading_tensor(d.X, t)
+        selectdim(P, ndims(P), i) .= Pᵢ
+
+        q = response_loading_vector(Y, t)
+        Q[:, i] = q
+
+        deflate_responses!(Y, t, q)
     end
-
-    NCPLSFit(d.X_mean, d.X_std, d.Yprim_mean, d.Yprim_std, d.Yadd_mean, d.Yadd_std)
+    R = score_projection_tensors(W_A, P)
+    B = regression_coefficients(R, Q)
+    
+    NCPLSFit(
+        m,
+        B,
+        R,
+        T,
+        P,
+        Q,
+        W_A,
+        c,
+        W0,
+        rho,
+        Y,
+        d.X_mean,
+        d.X_std,
+        d.Yprim_mean,
+        d.Yprim_std,
+        d.Yadd_mean,
+        d.Yadd_std,
+    )
 end

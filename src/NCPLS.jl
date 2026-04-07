@@ -4,6 +4,7 @@ using LinearAlgebra
 using Random
 using Statistics
 import StatsAPI: fit
+import CPPLS: cca_coeffs_and_corr
 
 include("NCPLS/types.jl")
 include("NCPLS/cca.jl")
