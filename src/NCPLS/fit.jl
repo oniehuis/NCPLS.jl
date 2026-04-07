@@ -11,13 +11,15 @@ function fit_ncpls_core(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
     Yprim::AbstractMatrix{<:Real};
-    obs_weights::T1=nothing
+    Yadd::T1=nothing,
+    obs_weights::T2=nothing
 ) where {
-    T1<:Union{AbstractVector{<:Real}, Nothing}
+    T1<:Union{AbstractMatrix{<:Real}, Nothing},
+    T2<:Union{AbstractVector{<:Real}, Nothing}
 }
 
     # Preprocess data: center/scale, optionally with weights.
-    d = preprocess(m, X, Yprim, obs_weights)
+    d = preprocess(m, X, Yprim, Yadd, obs_weights)
 
     # Preallocate arrays for scores, loadings, regression coefficients, and diagnostics.
 
@@ -28,5 +30,5 @@ function fit_ncpls_core(
 
     end
 
-    NCPLSFit(d.X_mean, d.X_std, d.Yprim_mean, d.Yprim_std)
+    NCPLSFit(d.X_mean, d.X_std, d.Yprim_mean, d.Yprim_std, d.Yadd_mean, d.Yadd_std)
 end

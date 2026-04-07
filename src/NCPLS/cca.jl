@@ -1,6 +1,34 @@
 using LinearAlgebra
 using Random
 
+function candidate_loading_weights(
+    X::AbstractArray{<:Real},
+    Y::AbstractMatrix{<:Real},
+    obs_weights::Union{AbstractVector{<:Real}, Nothing}
+)
+
+    n = size(X, 1)
+    Xₘ = reshape(X, n, :)
+    W0mat = if isnothing(obs_weights)
+        Xₘ' * Y
+    else
+        w = reshape(float64(obs_weights), n, 1)
+        (Xₘ .* w)' * Y
+    end
+
+    predictor_dims = size(X)[2:end]
+    W₀ = reshape(W0mat, predictor_dims..., size(Y, 2))
+
+    return (
+        W₀ = W₀,     # tensor-shaped candidate weights
+        W₀ₘ = W₀ₘ,   # unfolded matrix form, useful for Z0 = Xmat * W0mat
+        Y = Y,       # combined response block
+    )
+end
+
+
+
+
 # ------------------------------------------------------------
 # Utilities
 # ------------------------------------------------------------

@@ -2,6 +2,7 @@ function preprocess(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
     Yprim::AbstractMatrix{<:Real},
+    Yadd::Union{AbstractMatrix{<:Real}, Nothing},
     obs_weights::Union{AbstractVector{<:Real}, Nothing}
 )
 
@@ -9,9 +10,9 @@ function preprocess(
         "X must have at least 2 dimensions: samples × variables[/modes]"))
 
     nrow_X = size(X, 1)
-    nrow_Y, ncol_Y = size(Yprim)
+    nrow_Yprim, _ = size(Yprim)
 
-    nrow_X ≠ nrow_Y && throw(DimensionMismatch(
+    nrow_X ≠ nrow_Yprim && throw(DimensionMismatch(
         "Number of rows in X and Yprim must be equal"))
 
     X, X_mean, X_std = centerscale(float64(X), m.center_X, m.scale_X, obs_weights)
@@ -19,7 +20,17 @@ function preprocess(
     Yprim, Yprim_mean, Yprim_std = 
         centerscale(float64(Yprim), m.center_Yprim, m.scale_Yprim, obs_weights)
 
-    Y = Yprim
+    if isnothing(Yadd)
+        Y = Yprim
+        Yadd, Yadd_mean, Yadd_std = nothing, nothing, nothing
+    else
+        nrow_Yadd, _ = size(Yadd)
+        nrow_Yprim == nrow_Yadd || throw(DimensionMismatch(
+            "Yprim and Yadd must have the same number of rows"))
+        Yadd, Yadd_mean, Yadd_std = 
+            centerscale(float64(Yadd), m.center_Yadd, m.scale_Yadd, obs_weights)
+        Y = hcat(Yprim, float64(Yadd))
+    end
     
     (   # Preprocessed predictors
         X=X,
@@ -30,13 +41,18 @@ function preprocess(
         Yprim=Yprim,
         Yprim_mean=Yprim_mean,
         Yprim_std=Yprim_std, 
+
+        # Preprocessed additional responses
+        Yadd=Yadd,
+        Yadd_mean=Yadd_mean,
+        Yadd_std=Yadd_std, 
       
-        # Preprocessed combined (Yprim and Yaux) responses
+        # Preprocessed combined (Yprim and Yadd) responses
         Y=Y, 
       
         # Dimensions
         nrow_X=nrow_X, 
-        ncol_Y=ncol_Y, 
+        ncol_Y=size(Y, 2)
     )
 end
 

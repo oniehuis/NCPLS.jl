@@ -88,6 +88,8 @@ end
         scale_X = true,
         center_Yprim = true,
         scale_Yprim = true,
+        center_Yadd = true,
+        scale_Yadd = true,
     )
 
     X_matrix = Float64[
@@ -102,36 +104,75 @@ end
         1 0
         0 1
     ]
+    Yadd = reshape([2.0, 4.0, 6.0, 8.0], :, 1)
     weights = [1.0, 2.0, 1.0, 2.0]
 
-    d_matrix = NCPLS.preprocess(model, X_matrix, Y, weights)
+    d_matrix = NCPLS.preprocess(model, X_matrix, Y, Yadd, weights)
     @test size(d_matrix.X) == size(X_matrix)
     @test size(d_matrix.Yprim) == size(Y)
+    @test size(d_matrix.Yadd) == size(Yadd)
+    @test size(d_matrix.Y) == (4, 3)
+    @test d_matrix.ncol_Y == 3
     @test size(d_matrix.X_mean) == (2,)
     @test size(d_matrix.X_std) == (2,)
     @test size(d_matrix.Yprim_mean) == (2,)
     @test size(d_matrix.Yprim_std) == (2,)
-    @test d_matrix.Y == d_matrix.Yprim
+    @test size(d_matrix.Yadd_mean) == (1,)
+    @test size(d_matrix.Yadd_std) == (1,)
+    @test d_matrix.Y == hcat(d_matrix.Yprim, d_matrix.Yadd)
 
     w_matrix = reshape(weights, :, 1)
     @test sum(d_matrix.X .* w_matrix, dims = 1) ./ sum(weights) ≈ zeros(1, 2) atol=1e-12
     @test sum(d_matrix.Yprim .* w_matrix, dims = 1) ./ sum(weights) ≈ zeros(1, 2) atol=1e-12
+    @test sum(d_matrix.Yadd .* w_matrix, dims = 1) ./ sum(weights) ≈ zeros(1, 1) atol=1e-12
+    @test sqrt.(sum(w_matrix .* d_matrix.Yadd .^ 2, dims = 1) / sum(weights)) ≈ ones(1, 1)
 
     X_tensor = reshape(collect(1.0:24.0), 4, 3, 2)
-    d_tensor = NCPLS.preprocess(model, X_tensor, Y, nothing)
+    d_tensor = NCPLS.preprocess(model, X_tensor, Y, Yadd, nothing)
     @test size(d_tensor.X) == size(X_tensor)
     @test size(d_tensor.X_mean) == (3, 2)
     @test size(d_tensor.X_std) == (3, 2)
     @test size(d_tensor.Yprim_mean) == (2,)
     @test size(d_tensor.Yprim_std) == (2,)
+    @test size(d_tensor.Yadd_mean) == (1,)
+    @test size(d_tensor.Yadd_std) == (1,)
+    @test size(d_tensor.Y) == (4, 3)
+    @test d_tensor.ncol_Y == 3
+    @test d_tensor.Y == hcat(d_tensor.Yprim, d_tensor.Yadd)
     @test sum(d_tensor.X, dims = 1) ≈ zeros(1, 3, 2) atol=1e-12
     @test vec(sum(d_tensor.Yprim, dims = 1)) ≈ [0.0, 0.0] atol=1e-12
+    @test vec(sum(d_tensor.Yadd, dims = 1)) ≈ [0.0] atol=1e-12
 
-    @test_throws DimensionMismatch NCPLS.preprocess(model, X_tensor, Y[1:3, :], nothing)
+    d_no_yadd = NCPLS.preprocess(model, X_tensor, Y, nothing, nothing)
+    @test d_no_yadd.Y === d_no_yadd.Yprim
+    @test d_no_yadd.Yadd === nothing
+    @test d_no_yadd.Yadd_mean === nothing
+    @test d_no_yadd.Yadd_std === nothing
+    @test d_no_yadd.ncol_Y == size(Y, 2)
+
+    err_x_yprim = try
+        NCPLS.preprocess(model, X_tensor, Y[1:3, :], Yadd, nothing)
+        nothing
+    catch err
+        err
+    end
+    @test err_x_yprim isa DimensionMismatch
+    @test occursin("Number of rows in X and Yprim must be equal", sprint(showerror, err_x_yprim))
+
+    err_yprim_yadd = try
+        NCPLS.preprocess(model, X_tensor, Y, Yadd[1:3, :], nothing)
+        nothing
+    catch err
+        err
+    end
+    @test err_yprim_yadd isa DimensionMismatch
+    @test occursin("Yprim and Yadd must have the same number of rows", sprint(showerror, err_yprim_yadd))
+
     @test_throws ArgumentError NCPLS.preprocess(
         model,
         [1.0, 2.0, 3.0, 4.0],
         reshape([1.0, 2.0, 3.0, 4.0], :, 1),
+        reshape([5.0, 6.0, 7.0, 8.0], :, 1),
         nothing,
     )
 end
