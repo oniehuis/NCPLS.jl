@@ -5,12 +5,16 @@ using Test
     include(joinpath("NCPLS", "types.jl"))
 end
 
-@testset "NCPLS/cca.jl" begin
-    include(joinpath("NCPLS", "cca.jl"))
+@testset "NCPLS/computations.jl" begin
+    include(joinpath("NCPLS", "computations.jl"))
 end
 
 @testset "NCPLS/fit.jl" begin
     include(joinpath("NCPLS", "fit.jl"))
+end
+
+@testset "NCPLS/predict.jl" begin
+    include(joinpath("NCPLS", "predict.jl"))
 end
 
 @testset "NCPLS/preprocessing.jl" begin

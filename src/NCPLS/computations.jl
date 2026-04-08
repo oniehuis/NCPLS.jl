@@ -1,3 +1,14 @@
+"""
+    candidate_loading_weights(
+        X::AbstractArray{<:Real},
+        Y::AbstractMatrix{<:Real},
+        obs_weights::Union{AbstractVector{<:Real}, Nothing}
+    )
+
+Form the candidate loading weights `W₀` for NCPLS by contracting the predictor array `X`
+with the response matrix `Y` over the sample dimension. Observation weights are applied
+along the same dimension when provided.
+"""
 function candidate_loading_weights(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real},
@@ -16,6 +27,15 @@ function candidate_loading_weights(
     reshape(W₀ₘ, size(X)[2:end]..., size(Y, 2))
 end
 
+"""
+    candidate_scores(
+        X::AbstractArray{<:Real},
+        W₀::AbstractArray{<:Real}
+    )
+
+Form the candidate score matrix `Z₀ = X ⓓ W₀`. The returned matrix has one row per sample
+and one column per response direction in the last dimension of `W₀`.
+"""
 function candidate_scores(
     X::AbstractArray{<:Real},
     W₀::AbstractArray{<:Real},
@@ -38,6 +58,15 @@ function candidate_scores(
     Xₘ * W₀ₘ
 end
 
+"""
+    orthogonalize_on_accumulated_scores(
+        X::AbstractVecOrMat{Float64},
+        T_A::AbstractMatrix{Float64}
+    )
+
+Orthogonalize the vector or matrix `X` on the accumulated score vectors stored in `T_A`
+using the manuscript formula `X - T_A * (T_A' * X)`.
+"""
 function orthogonalize_on_accumulated_scores(
     X::AbstractVecOrMat{Float64},
     T_A::AbstractMatrix{Float64},
@@ -50,7 +79,15 @@ function orthogonalize_on_accumulated_scores(
     X - T_A * (T_A' * X)
 end
 
+"""
+    loading_weights(
+        W₀::AbstractArray{<:Real},
+        c::AbstractVector{<:Real}
+    )
 
+Collapse the candidate loading weights `W₀` with the dominant left canonical weight
+vector `c` to form `W = W₀ ⓐ₁ c`.
+"""
 function loading_weights(
     W₀::AbstractArray{<:Real},
     c::AbstractVector{<:Real},
@@ -65,6 +102,15 @@ function loading_weights(
     reshape(Wₘ, predictor_dims...)
 end
 
+"""
+    score_vector(
+        X::AbstractArray{<:Real},
+        Wᵒ::AbstractArray{<:Real}
+    )
+
+Form the score vector `t = X ⓓ Wᵒ` by contracting `X` with the loading-weight object
+`Wᵒ` over all non-sample dimensions.
+"""
 function score_vector(
     X::AbstractArray{<:Real},
     Wᵒ::AbstractArray{<:Real},
@@ -75,6 +121,11 @@ function score_vector(
     reshape(X, size(X, 1), :) * vec(Wᵒ)
 end
 
+"""
+    normalize_vector(t::AbstractVector{Float64})
+
+Return `t / norm(t)`. An `ArgumentError` is thrown if `t` has zero norm.
+"""
 function normalize_vector(
     t::AbstractVector{Float64},
 )
@@ -84,6 +135,15 @@ function normalize_vector(
     t / t_norm
 end
 
+"""
+    loading_tensor(
+        X::AbstractArray{Float64},
+        t::AbstractVector{Float64}
+    )
+
+Form the loading tensor `P = Xᵗ_d ⓐ₁ t` by contracting `X` with the score vector `t`
+over the sample dimension.
+"""
 function loading_tensor(
     X::AbstractArray{Float64},
     t::AbstractVector{Float64},
@@ -95,6 +155,15 @@ function loading_tensor(
     reshape(Pₘ, size(X)[2:end]...)
 end
 
+"""
+    response_loading_vector(
+        Yprim::AbstractMatrix{Float64},
+        t::AbstractVector{Float64}
+    )
+
+Form the response loading vector `q = Y' * t` from the current primary-response matrix
+and score vector.
+"""
 function response_loading_vector(
     Yprim::AbstractMatrix{Float64},
     t::AbstractVector{Float64},
@@ -105,6 +174,16 @@ function response_loading_vector(
     Yprim' * t
 end
 
+"""
+    deflate_responses!(
+        Yprim::AbstractMatrix{Float64},
+        t::AbstractVector{Float64},
+        q::AbstractVector{Float64}
+    )
+
+Deflate the response matrix in place using the rank-1 update `Y := Y - t q'` and return
+the mutated matrix.
+"""
 function deflate_responses!(
     Yprim::AbstractMatrix{Float64},
     t::AbstractVector{Float64},
@@ -119,6 +198,15 @@ function deflate_responses!(
     Yprim
 end
 
+"""
+    score_projection_tensors(
+        W_A::AbstractArray{Float64},
+        P_A::AbstractArray{Float64}
+    )
+
+Form the score projection tensor `R = W_A ⓐ₁ (P_Aᵗ¹ ⓓ W_A)⁻¹` used for score
+prediction after the component loop.
+"""
 function score_projection_tensors(
     W_A::AbstractArray{Float64},
     P_A::AbstractArray{Float64},
@@ -136,6 +224,15 @@ function score_projection_tensors(
     reshape(Rm, size(W_A)...)
 end
 
+"""
+    regression_coefficients(
+        R::AbstractArray{Float64},
+        Q_A::AbstractMatrix{Float64}
+    )
+
+Form the cumulative regression coefficients `B = cumsum(R ⊙₁ Q_Aᵗ)` along the component
+dimension.
+"""
 function regression_coefficients(
     R::AbstractArray{Float64},
     Q_A::AbstractMatrix{Float64},
@@ -158,179 +255,54 @@ function regression_coefficients(
     cumsum(R_exp .* Q_exp; dims = length(predictor_dims) + 1)
 end
 
-
-# ------------------------------------------------------------
-# Utilities
-# ------------------------------------------------------------
-
 """
-    outer_tensor(factors)
+    multilinear_loading_weight_tensor(W, W_modes_prev, m, rng; verbose=false)
 
-Construct the rank-1 outer product tensor:
-    a¹ ∘ a² ∘ ... ∘ aᵈ
-from a vector of factor vectors.
+Apply the multilinear loading-weight branch of the NCPLS algorithm to `W`. The factors
+are extracted according to the dimensionality of `W`, optionally orthogonalized on the
+previous mode weights stored in `W_modes_prev`, normalized, and finally recombined into
+`Wᵒ` as an outer product.
 """
-function outer_tensor(factors::AbstractVector{<:AbstractVector})
-    dims = map(length, factors)
-    T = Array{Float64}(undef, dims...)
-    for I in CartesianIndices(T)
-        v = 1.0
-        @inbounds for m in eachindex(factors)
-            v *= factors[m][I[m]]
+function multilinear_loading_weight_tensor(
+    W::AbstractArray{Float64},
+    W_modes_prev::AbstractVector{<:AbstractMatrix{Float64}},
+    m::NCPLSModel,
+    rng::MersenneTwister;
+    verbose::Bool=false)
+
+    ml = multilinear_weights(W, m, rng; verbose=verbose)
+
+    factors = [copy(f) for f in ml.factors]
+
+    for j in eachindex(factors)
+        if m.orthogonalize_mode_weights
+            factors[j] = orthogonalize_on_accumulated_scores(factors[j], W_modes_prev[j])
         end
-        T[I] = v
-    end
-    return T
-end
-
-"""
-    contract_except(X, factors, mode)
-
-Contract tensor X with all factor vectors except `mode`.
-
-If X has size (K1, K2, ..., Kd), the result is a vector of length K_mode.
-"""
-function contract_except(X::AbstractArray, factors::AbstractVector{<:AbstractVector}, mode::Int)
-    nd = ndims(X)
-    @assert length(factors) == nd
-    out = zeros(Float64, size(X, mode))
-
-    for I in CartesianIndices(X)
-        prod = 1.0
-        @inbounds for m in 1:nd
-            if m != mode
-                prod *= factors[m][I[m]]
-            end
-        end
-        @inbounds out[I[mode]] += X[I] * prod
+        factors[j] = normalize_vector(factors[j])
     end
 
-    return out
-end
-
-"""
-    parafac_rank1(X; maxiter=500, tol=1e-10, init=:hosvd, rng=MersenneTwister(1), verbose=false)
-
-Fit a rank-1 PARAFAC / CP model:
-    X ≈ λ * a¹ ∘ a² ∘ ... ∘ aᵈ
-
-Returns:
-    (lambda, factors, Xhat, fit, relerr, niter, converged)
-"""
-function parafac_rank1(
-    X::AbstractArray;
-    maxiter::Int = 500,
-    tol::Float64 = 1e-10,
-    init::Symbol = :hosvd,
-    rng = MersenneTwister(1),
-    verbose::Bool = false,
-)
-    nd = ndims(X)
-    dims = size(X)
-    Xnorm = norm(X)
-    Xnorm == 0 && error("Zero tensor not supported.")
-
-    factors = Vector{Vector{Float64}}(undef, nd)
-
-    if init == :random
-        for m in 1:nd
-            v = randn(rng, dims[m])
-            factors[m] = v / norm(v)
-        end
-    elseif init == :hosvd
-        for m in 1:nd
-            perm = (m, filter(i -> i != m, 1:nd)...)
-            Xm = permutedims(X, perm)
-            Xmat = reshape(Xm, dims[m], :)
-            U, _, _ = svd(Xmat)
-            factors[m] = U[:, 1]
-        end
-    else
-        error("Unknown init = $init. Use :random or :hosvd.")
-    end
-
-    relerr_old = Inf
-    converged = false
-
-    for iter in 1:maxiter
-        for m in 1:nd
-            v = contract_except(X, factors, m)
-            nv = norm(v)
-            nv == 0 && error("Degenerate update encountered in mode $m.")
-            factors[m] = v / nv
-        end
-
-        rank1_unit = outer_tensor(factors)
-        λ = sum(X .* rank1_unit)
-        Xhat = λ .* rank1_unit
-        relerr = norm(X .- Xhat) / Xnorm
-
-        if verbose
-            @info "iter=$iter relerr=$relerr λ=$λ"
-        end
-
-        if abs(relerr_old - relerr) < tol
-            converged = true
-            return (
-                lambda = λ,
-                factors = factors,
-                Xhat = Xhat,
-                fit = norm(Xhat)^2 / Xnorm^2,
-                relerr = relerr,
-                niter = iter,
-                converged = converged,
-            )
-        end
-
-        relerr_old = relerr
-    end
-
-    rank1_unit = outer_tensor(factors)
-    λ = sum(X .* rank1_unit)
-    Xhat = λ .* rank1_unit
-
-    return (
-        lambda = λ,
-        factors = factors,
-        Xhat = Xhat,
-        fit = norm(Xhat)^2 / Xnorm^2,
-        relerr = norm(X .- Xhat) / Xnorm,
-        niter = maxiter,
-        converged = converged,
-    )
-end
-
-# ------------------------------------------------------------
-# N-CPLS helper
-# ------------------------------------------------------------
-
-"""
-    multilinear_weights(W; maxiter=500, tol=1e-10, init=:hosvd, rng=MersenneTwister(1))
-
-Convert a full weight object W into multilinear mode-wise weights.
-
-Behavior:
-- if W is a vector: normalize it
-- if W is a matrix: use rank-1 SVD
-- if W is 3D or higher: use rank-1 PARAFAC
-
-Returns a named tuple:
     (
-        factors,     # Vector of mode-wise weight vectors
-        W_rank1,     # rank-1 approximation tensor/matrix/vector
-        lambda,      # scalar magnitude
-        relerr,      # relative reconstruction error
-        method       # :vector, :svd, or :parafac
+        factors = factors,
+        Wᵒ = outer_tensor(factors),
+        lambda = ml.lambda,
+        relerr = ml.relerr,
+        method = ml.method,
     )
+end
 
-This is the helper you can drop into the multilinear branch of N-CPLS.
+"""
+    multilinear_weights(W, m, rng; verbose=false)
+
+Extract multilinear mode weights from `W` using the control settings stored in `m`. A
+vector is normalized directly, a matrix is reduced by its dominant rank-1 SVD pair, and
+an array with three or more dimensions is approximated by a rank-1 PARAFAC model. The
+returned named tuple contains `factors`, `W_rank1`, `lambda`, `relerr`, and `method`.
 """
 function multilinear_weights(
-    W::AbstractArray;
-    maxiter::Int = 500,
-    tol::Float64 = 1e-10,
-    init::Symbol = :hosvd,
-    rng = MersenneTwister(1),
+    W::AbstractArray, 
+    m::NCPLSModel, 
+    rng::MersenneTwister;
+    verbose::Bool=false
 )
     d = ndims(W)
 
@@ -362,20 +334,154 @@ function multilinear_weights(
             method = :svd,
         )
     else
-        fit = parafac_rank1(
-            Array{Float64}(W);
-            maxiter=maxiter,
-            tol=tol,
-            init=init,
-            rng=rng,
-        )
+        pf = parafac_rank1(Array{Float64}(W), m, rng; verbose=verbose)
+
 
         return (
-            factors = fit.factors,
-            W_rank1 = fit.Xhat,
-            lambda = fit.lambda,
-            relerr = fit.relerr,
+            factors = pf.factors,
+            W_rank1 = pf.Xhat,
+            lambda = pf.lambda,
+            relerr = pf.relerr,
             method = :parafac,
         )
     end
+end
+
+# ------------------------------------------------------------
+# Utilities
+# ------------------------------------------------------------
+
+"""
+    outer_tensor(factors)
+
+Construct the rank-1 outer product tensor `a¹ ∘ a² ∘ ... ∘ aᵈ` from the vectors in
+`factors`.
+"""
+function outer_tensor(factors::AbstractVector{<:AbstractVector})
+    dims = map(length, factors)
+    T = Array{Float64}(undef, dims...)
+    for I in CartesianIndices(T)
+        v = 1.0
+        @inbounds for m in eachindex(factors)
+            v *= factors[m][I[m]]
+        end
+        T[I] = v
+    end
+    T
+end
+
+"""
+    contract_except(X, factors, mode)
+
+Contract `X` with all vectors in `factors` except the one indexed by `mode`. This is the
+alternating least-squares update used by `parafac_rank1`.
+"""
+function contract_except(
+    X::AbstractArray, 
+    factors::AbstractVector{<:AbstractVector}, 
+    mode::Int
+)
+    nd = ndims(X)
+    @assert length(factors) == nd
+    out = zeros(Float64, size(X, mode))
+
+    for I in CartesianIndices(X)
+        prod = 1.0
+        @inbounds for m in 1:nd
+            if m ≠ mode
+                prod *= factors[m][I[m]]
+            end
+        end
+        @inbounds out[I[mode]] += X[I] * prod
+    end
+
+    out
+end
+
+"""
+    parafac_rank1(X, m, rng; verbose=false)
+
+Fit the rank-1 PARAFAC model `X ≈ λ * a¹ ∘ a² ∘ ... ∘ aᵈ` using the initialization,
+iteration limit, and convergence tolerance stored in `m`. The returned named tuple
+contains `lambda`, `factors`, `Xhat`, `fit`, `relerr`, `niter`, and `converged`.
+"""
+function parafac_rank1(
+    X::AbstractArray, 
+    m::NCPLSModel, 
+    rng::MersenneTwister; 
+    verbose::Bool=false
+)
+    nd = ndims(X)
+    dims = size(X)
+    Xnorm = norm(X)
+    Xnorm == 0 && error("Zero tensor not supported.")
+
+    factors = Vector{Vector{Float64}}(undef, nd)
+
+    if m.multilinear_init ≡ :random
+        for m in 1:nd
+            v = randn(rng, dims[m])
+            factors[m] = v / norm(v)
+        end
+    elseif m.multilinear_init ≡ :hosvd
+        for m in 1:nd
+            perm = (m, filter(i -> i ≠ m, 1:nd)...)
+            Xm = permutedims(X, perm)
+            Xmat = reshape(Xm, dims[m], :)
+            U, _, _ = svd(Xmat)
+            factors[m] = U[:, 1]
+        end
+    else
+        error("Unknown init = $(m.multilinear_init). Use :random or :hosvd.")
+    end
+
+    relerr_old = Inf
+    converged = false
+
+    for iter in 1:m.multilinear_maxiter
+        for m in 1:nd
+            v = contract_except(X, factors, m)
+            nv = norm(v)
+            nv == 0 && error("Degenerate update encountered in mode $m.")
+            factors[m] = v / nv
+        end
+
+        rank1_unit = outer_tensor(factors)
+        λ = sum(X .* rank1_unit)
+        Xhat = λ .* rank1_unit
+        relerr = norm(X .- Xhat) / Xnorm
+
+        if verbose
+            @info "iter=$iter relerr=$relerr λ=$λ"
+        end
+
+        if abs(relerr_old - relerr) < m.multilinear_tol
+            converged = true
+            return (
+                lambda = λ,
+                factors = factors,
+                Xhat = Xhat,
+                fit = norm(Xhat)^2 / Xnorm^2,
+                relerr = relerr,
+                niter = iter,
+                converged = converged,
+            )
+        end
+
+        relerr_old = relerr
+    end
+
+    rank1_unit = outer_tensor(factors)
+    λ = sum(X .* rank1_unit)
+    Xhat = λ .* rank1_unit
+
+    (
+        lambda = λ,
+        factors = factors,
+        Xhat = Xhat,
+        fit = norm(Xhat)^2 / Xnorm^2,
+        relerr = norm(X .- Xhat) / Xnorm,
+        niter = m.multilinear_maxiter,
+        converged = converged
+    )
 end

@@ -1,9 +1,9 @@
 """
     NCPLSModel
 
-Model specification passed to `fit`. A `NCPLSModel` stores the user-controlled settings
-for n-CPLS fitting, most importantly `ncomponents` and centering and scaling of predictor 
-and response variables.
+Model specification passed to `fit`. An `NCPLSModel` stores the centering and scaling
+options, the number of extracted components, and the settings that control the
+multilinear loading-weight branch.
 """
 struct NCPLSModel
     ncomponents::Int
@@ -14,6 +14,11 @@ struct NCPLSModel
     center_Yadd::Bool
     scale_Yadd::Bool
     multilinear::Bool
+    orthogonalize_mode_weights::Bool
+    multilinear_maxiter::Int
+    multilinear_tol::Float64
+    multilinear_init::Symbol
+    multilinear_seed::Int
 end
 
 """
@@ -25,11 +30,21 @@ end
         scale_Yprim::Bool=false,
         center_Yadd::Bool=true,
         scale_Yadd::Bool=false,
-        multilinear::Bool=false
+        multilinear::Bool=false,
+        orthogonalize_mode_weights::Bool=false,
+        multilinear_maxiter::Int=500,
+        multilinear_tol::Float64=1e-10,
+        multilinear_init::Symbol=:hosvd,
+        multilinear_seed::Int=1
     )
 
-Construct a model specification for `fit`. The most commonly adjusted setting is
-`ncomponents`.
+Construct an `NCPLSModel` with the given fitting options. The multilinear control fields
+govern initialization, iteration limits, and convergence in the PARAFAC step.
+
+`multilinear_init` selects the starting values for rank-1 PARAFAC fits. The supported
+options are `:hosvd`, which initializes each mode with the leading left singular vector
+of the corresponding unfolding, and `:random`, which initializes each mode with a
+random unit vector drawn using `multilinear_seed`.
 """
 function NCPLSModel(;
     ncomponents::T1=2,
@@ -39,12 +54,21 @@ function NCPLSModel(;
     scale_Yprim::Bool=false,
     center_Yadd::Bool=true,
     scale_Yadd::Bool=false,
-    multilinear::Bool=false
+    multilinear::Bool=false,
+    orthogonalize_mode_weights::Bool=false,
+    multilinear_maxiter::Int=500,
+    multilinear_tol::Float64=1e-10,
+    multilinear_init::Symbol=:hosvd,
+    multilinear_seed::Int=1
 ) where {
         T1<:Integer
     }
 
     ncomponents > 0 || throw(ArgumentError("ncomponents must be greater than zero"))
+    multilinear_maxiter > 0 || throw(ArgumentError("multilinear_maxiter must be greater than zero"))
+    multilinear_tol >= 0 || throw(ArgumentError("multilinear_tol must be non-negative"))
+    multilinear_init in (:hosvd, :random) || throw(ArgumentError(
+        "multilinear_init must be :hosvd or :random"))
 
     NCPLSModel(
         Int(ncomponents),
@@ -54,7 +78,12 @@ function NCPLSModel(;
         scale_Yprim,
         center_Yadd,
         scale_Yadd,
-        multilinear
+        multilinear,
+        orthogonalize_mode_weights,
+        multilinear_maxiter,
+        multilinear_tol,
+        multilinear_init,
+        multilinear_seed,
     )
 end
 
@@ -68,6 +97,11 @@ function Base.show(io::IO, m::NCPLSModel)
         ", center_Yadd=", m.center_Yadd,
         ", scale_Yadd=", m.scale_Yadd,
         ", multilinear=", m.multilinear,
+        ", orthogonalize_mode_weights=", m.orthogonalize_mode_weights,
+        ", multilinear_maxiter=", m.multilinear_maxiter,
+        ", multilinear_tol=", m.multilinear_tol,
+        ", multilinear_init=", repr(m.multilinear_init),
+        ", multilinear_seed=", m.multilinear_seed,
         ")")
 end
 
@@ -81,21 +115,64 @@ function Base.show(io::IO, ::MIME"text/plain", m::NCPLSModel)
     println(io, "  center_Yadd: ", m.center_Yadd)
     println(io, "  scale_Yadd: ", m.scale_Yadd)
     println(io, "  multilinear: ", m.multilinear)
+    println(io, "  orthogonalize_mode_weights: ", m.orthogonalize_mode_weights)
+    println(io, "  multilinear_maxiter: ", m.multilinear_maxiter)
+    println(io, "  multilinear_tol: ", m.multilinear_tol)
+    println(io, "  multilinear_init: ", m.multilinear_init)
+    println(io, "  multilinear_seed: ", m.multilinear_seed)
 end
 
 """
     AbstractNCPLSFit
 
-Common supertype for fitted NCPLS models that share the fields ... . 
+Abstract supertype for fitted NCPLS models.
 """
 abstract type AbstractNCPLSFit end
 
 """
+    coef(mf::AbstractNCPLSFit)
+    coef(mf::AbstractNCPLSFit, ncomps::Integer)
+
+Return the regression coefficients for the final or requested number of components.
+"""
+coef(mf::AbstractNCPLSFit) = coef(mf, ncomponents(mf))
+coef(mf::AbstractNCPLSFit, ncomps::Integer) = @views selectdim(
+    mf.B, ndims(mf.B) - 1, validate_ncomponents(mf, ncomps))
+
+"""
+    xmean(mf::AbstractNCPLSFit)
+
+Return the predictor mean array for the fitted model.
+"""
+xmean(mf::AbstractNCPLSFit) = mf.X_mean
+
+"""
+    xstd(mf::AbstractNCPLSFit)
+
+Return the predictor standard deviation array for the fitted model.
+"""
+xstd(mf::AbstractNCPLSFit) = mf.X_std
+
+"""
+    ymean(mf::AbstractNCPLSFit)
+
+Return the primary-response mean vector for the fitted model.
+"""
+ymean(mf::AbstractNCPLSFit) = mf.Yprim_mean
+
+"""
+    ystd(mf::AbstractNCPLSFit)
+
+Return the primary-response standard deviation vector for the fitted model.
+"""
+ystd(mf::AbstractNCPLSFit) = mf.Yprim_std
+
+"""
     NCPLSFit
 
-Full fitted NCPLS model returned by `fit`. This stores the fitted projection and
-regression objects together with component-wise scores/loadings and preprocessing
-statistics needed for prediction and diagnostics.
+Fitted NCPLS model returned by `fit`. An `NCPLSFit` stores the regression and projection
+objects, component-wise scores and loadings, multilinear diagnostics, and the
+preprocessing statistics needed for prediction and inspection.
 """
 struct NCPLSFit{
     TModel<:NCPLSModel,
@@ -105,10 +182,14 @@ struct NCPLSFit{
     TP,
     TQ,
     TW,
+    TWModes,
     Tc,
     TW0,
     Trho,
     TYres,
+    TWMLRelerr,
+    TWMLMethod,
+    TWMLLambda,
     TXStat,
     TYStat,
     TYAddStat,
@@ -121,10 +202,14 @@ struct NCPLSFit{
     P::TP
     Q::TQ
     W::TW
+    W_modes::TWModes
     c::Tc
     W0::TW0
     rho::Trho
     Yres::TYres
+    W_multilinear_relerr::TWMLRelerr
+    W_multilinear_method::TWMLMethod
+    W_multilinear_lambda::TWMLLambda
     X_mean::TXStat
     X_std::TXStat
     Yprim_mean::TYStat
@@ -134,9 +219,105 @@ struct NCPLSFit{
 end
 
 function Base.show(io::IO, mf::NCPLSFit)
-    print(io, "NCPLSFit")
+    print(io, "NCPLSFit(",
+        "samples=", size(mf.T, 1),
+        ", predictor_dims=", repr(size(mf.B)[1:end-2]),
+        ", responses=", size(mf.B, ndims(mf.B)),
+        ", components=", size(mf.B, ndims(mf.B) - 1),
+        ", multilinear=", mf.model.multilinear,
+        ")")
 end
 
 function Base.show(io::IO, ::MIME"text/plain", mf::NCPLSFit)
     println(io, "NCPLSFit")
+    println(io, "  samples: ", size(mf.T, 1))
+    println(io, "  predictor_dims: ", repr(size(mf.B)[1:end-2]))
+    println(io, "  responses: ", size(mf.B, ndims(mf.B)))
+    println(io, "  components: ", size(mf.B, ndims(mf.B) - 1))
+    print(io, "  multilinear: ", mf.model.multilinear)
+end
+
+"""
+    xscores(mf::NCPLSFit)
+    xscores(mf::NCPLSFit, comp::Integer)
+    xscores(mf::NCPLSFit, comps::AbstractUnitRange{<:Integer})
+    xscores(mf::NCPLSFit, comps::AbstractVector{<:Integer})
+
+Return the predictor score matrix for the fitted model, or a subset of its columns.
+"""
+xscores(mf::NCPLSFit) = mf.T
+
+function xscores(mf::NCPLSFit, comp::Integer)
+    ncomp = size(mf.T, 2)
+    1 ≤ comp ≤ ncomp || throw(
+        ArgumentError("Component index $comp out of bounds (1:$ncomp)"))
+    view(mf.T, :, comp)
+end
+
+function xscores(mf::NCPLSFit, comps::AbstractUnitRange{<:Integer})
+    ncomp = size(mf.T, 2)
+    (1 ≤ first(comps) ≤ ncomp && 1 ≤ last(comps) ≤ ncomp) || throw(
+        ArgumentError("Component range $(comps) out of bounds (1:$ncomp)"))
+    view(mf.T, :, comps)
+end
+
+function xscores(mf::NCPLSFit, comps::AbstractVector{<:Integer})
+    ncomp = size(mf.T, 2)
+    all(1 .≤ comps .≤ ncomp) || throw(
+        ArgumentError("Component indices $(comps) out of bounds (1:$ncomp)"))
+    view(mf.T, :, comps)
+end
+
+"""
+    fitted(mf::NCPLSFit)
+    fitted(mf::NCPLSFit, ncomps::Integer)
+
+Return the fitted response matrix for the final or requested number of components.
+"""
+fitted(mf::NCPLSFit) = fitted(mf, ncomponents(mf))
+function fitted(mf::NCPLSFit, ncomps::Integer)
+    ncomps = validate_ncomponents(mf, ncomps)
+    Yhat = @views mf.T[:, 1:ncomps] * mf.Q[:, 1:ncomps]'
+    restore_response_scale(Yhat, mf; add_mean=true)
+end
+
+"""
+    residuals(mf::NCPLSFit)
+    residuals(mf::NCPLSFit, ncomps::Integer)
+
+Return the response residual matrix for the final or requested number of components.
+"""
+residuals(mf::NCPLSFit) = residuals(mf, ncomponents(mf))
+function residuals(mf::NCPLSFit, ncomps::Integer)
+    ncomps = validate_ncomponents(mf, ncomps)
+
+    Yres = if ncomps == ncomponents(mf)
+        mf.Yres
+    else
+        @views mf.Yres + mf.T[:, ncomps+1:end] * mf.Q[:, ncomps+1:end]'
+    end
+
+    restore_response_scale(Yres, mf; add_mean=false)
+end
+
+ncomponents(mf::AbstractNCPLSFit) = size(mf.B, ndims(mf.B) - 1)
+
+function validate_ncomponents(mf::AbstractNCPLSFit, ncomps::Integer)
+    1 ≤ ncomps ≤ ncomponents(mf) || throw(DimensionMismatch(
+        "ncomps exceeds the number of components in the model"))
+    ncomps
+end
+
+function restore_response_scale(
+    Y::AbstractArray{<:Real},
+    mf::NCPLSFit;
+    add_mean::Bool
+)
+    M = length(mf.Yprim_std)
+    lead_dims = ntuple(_ -> 1, ndims(Y) - 1)
+    Ystd = reshape(mf.Yprim_std, lead_dims..., M)
+    Ymean = reshape(mf.Yprim_mean, lead_dims..., M)
+
+    Y_restored = float64(Y) .* Ystd
+    add_mean ? Y_restored .+ Ymean : Y_restored
 end

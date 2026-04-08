@@ -1,4 +1,7 @@
-@testset "fit_ncpls_core returns preprocessing-backed fit for matrices" begin
+import Random
+import Logging
+
+@testset "fit_ncpls_core returns fitted arrays for matrices" begin
     model = NCPLS.NCPLSModel(
         ncomponents = 2,
         center_X = true,
@@ -24,33 +27,35 @@
     weights = [1.0, 2.0, 1.0, 2.0]
 
     d = NCPLS.preprocess(model, X, Y, Yadd, weights)
-    fit = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = weights)
+    mf = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = weights)
 
-    @test fit isa NCPLS.AbstractNCPLSFit
-    @test fit isa NCPLS.NCPLSFit
-    @test fit.model == model
-    @test size(fit.B) == (2, 2, 2)
-    @test size(fit.R) == (2, 2)
-    @test size(fit.T) == (4, 2)
-    @test size(fit.P) == (2, 2)
-    @test size(fit.Q) == (2, 2)
-    @test size(fit.W) == (2, 2)
-    @test size(fit.c) == (3, 2)
-    @test size(fit.W0) == (2, 3, 2)
-    @test length(fit.rho) == 2
-    @test size(fit.Yres) == size(Y)
-    @test vec(sum(fit.T .^ 2; dims = 1)) ≈ ones(2) atol = 1e-12
-    @test fit.R ≈ NCPLS.score_projection_tensors(fit.W, fit.P)
-    @test fit.B ≈ NCPLS.regression_coefficients(fit.R, fit.Q)
-    @test fit.X_mean ≈ d.X_mean
-    @test fit.X_std ≈ d.X_std
-    @test fit.Yprim_mean ≈ d.Yprim_mean
-    @test fit.Yprim_std ≈ d.Yprim_std
-    @test fit.Yadd_mean ≈ d.Yadd_mean
-    @test fit.Yadd_std ≈ d.Yadd_std
+    @test mf isa NCPLS.NCPLSFit
+    @test mf.model == model
+    @test size(mf.B) == (2, 2, 2)
+    @test size(mf.R) == (2, 2)
+    @test size(mf.T) == (4, 2)
+    @test size(mf.P) == (2, 2)
+    @test size(mf.Q) == (2, 2)
+    @test size(mf.W) == (2, 2)
+    @test size(mf.c) == (3, 2)
+    @test size(mf.W0) == (2, 3, 2)
+    @test size(mf.Yres) == size(Y)
+    @test mf.W_modes === nothing
+    @test mf.W_multilinear_relerr === nothing
+    @test mf.W_multilinear_method === nothing
+    @test mf.W_multilinear_lambda === nothing
+    @test vec(sum(mf.T .^ 2; dims = 1)) ≈ ones(2) atol = 1e-12
+    @test mf.R ≈ NCPLS.score_projection_tensors(mf.W, mf.P)
+    @test mf.B ≈ NCPLS.regression_coefficients(mf.R, mf.Q)
+    @test mf.X_mean ≈ d.X_mean
+    @test mf.X_std ≈ d.X_std
+    @test mf.Yprim_mean ≈ d.Yprim_mean
+    @test mf.Yprim_std ≈ d.Yprim_std
+    @test mf.Yadd_mean ≈ d.Yadd_mean
+    @test mf.Yadd_std ≈ d.Yadd_std
 end
 
-@testset "fit_ncpls_core returns preprocessing-backed fit for tensors" begin
+@testset "fit_ncpls_core returns fitted arrays for tensors" begin
     model = NCPLS.NCPLSModel(
         ncomponents = 3,
         center_X = true,
@@ -70,31 +75,33 @@ end
     Yadd = reshape([10.0, 20.0, 10.0, 20.0], :, 1)
 
     d = NCPLS.preprocess(model, X, Y, Yadd, nothing)
-    fit = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
+    mf = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
 
-    @test fit isa NCPLS.AbstractNCPLSFit
-    @test fit isa NCPLS.NCPLSFit
-    @test fit.model == model
-    @test size(fit.B) == (3, 2, 3, 2)
-    @test size(fit.R) == (3, 2, 3)
-    @test size(fit.T) == (4, 3)
-    @test size(fit.P) == (3, 2, 3)
-    @test size(fit.Q) == (2, 3)
-    @test size(fit.W) == (3, 2, 3)
-    @test size(fit.c) == (3, 3)
-    @test size(fit.W0) == (3, 2, 3, 3)
-    @test length(fit.rho) == 3
-    @test size(fit.Yres) == size(Y)
-    @test vec(sum(fit.T .^ 2; dims = 1)) ≈ ones(3) atol = 1e-12
-    @test fit.R ≈ NCPLS.score_projection_tensors(fit.W, fit.P)
-    @test fit.B ≈ NCPLS.regression_coefficients(fit.R, fit.Q)
-    @test size(fit.X_mean) == (3, 2)
-    @test fit.X_mean ≈ d.X_mean
-    @test fit.X_std ≈ d.X_std
-    @test fit.Yprim_mean ≈ d.Yprim_mean
-    @test fit.Yprim_std ≈ d.Yprim_std
-    @test fit.Yadd_mean ≈ d.Yadd_mean
-    @test fit.Yadd_std ≈ d.Yadd_std
+    @test mf isa NCPLS.NCPLSFit
+    @test mf.model == model
+    @test size(mf.B) == (3, 2, 3, 2)
+    @test size(mf.R) == (3, 2, 3)
+    @test size(mf.T) == (4, 3)
+    @test size(mf.P) == (3, 2, 3)
+    @test size(mf.Q) == (2, 3)
+    @test size(mf.W) == (3, 2, 3)
+    @test size(mf.c) == (3, 3)
+    @test size(mf.W0) == (3, 2, 3, 3)
+    @test size(mf.Yres) == size(Y)
+    @test mf.W_modes === nothing
+    @test mf.W_multilinear_relerr === nothing
+    @test mf.W_multilinear_method === nothing
+    @test mf.W_multilinear_lambda === nothing
+    @test vec(sum(mf.T .^ 2; dims = 1)) ≈ ones(3) atol = 1e-12
+    @test mf.R ≈ NCPLS.score_projection_tensors(mf.W, mf.P)
+    @test mf.B ≈ NCPLS.regression_coefficients(mf.R, mf.Q)
+    @test size(mf.X_mean) == (3, 2)
+    @test mf.X_mean ≈ d.X_mean
+    @test mf.X_std ≈ d.X_std
+    @test mf.Yprim_mean ≈ d.Yprim_mean
+    @test mf.Yprim_std ≈ d.Yprim_std
+    @test mf.Yadd_mean ≈ d.Yadd_mean
+    @test mf.Yadd_std ≈ d.Yadd_std
 end
 
 @testset "fit wrapper delegates to fit_ncpls_core" begin
@@ -130,6 +137,14 @@ end
     via_wrapper = NCPLS.fit(model, X, Y; Yadd = Yadd, obs_weights = weights)
     via_core = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = weights)
 
+    @test via_wrapper.B ≈ via_core.B
+    @test via_wrapper.R ≈ via_core.R
+    @test via_wrapper.T ≈ via_core.T
+    @test via_wrapper.P ≈ via_core.P
+    @test via_wrapper.Q ≈ via_core.Q
+    @test via_wrapper.W ≈ via_core.W
+    @test via_wrapper.rho ≈ via_core.rho
+    @test via_wrapper.Yres ≈ via_core.Yres
     @test via_wrapper.X_mean ≈ via_core.X_mean
     @test via_wrapper.X_std ≈ via_core.X_std
     @test via_wrapper.Yprim_mean ≈ via_core.Yprim_mean
@@ -145,17 +160,20 @@ end
     Y = rand(4, 2)
     Yadd = rand(4, 1)
 
-    fit_no_yadd = NCPLS.fit_ncpls_core(
+    mf_no_yadd = NCPLS.fit_ncpls_core(
         model,
         X_matrix,
         Y;
         obs_weights = nothing,
     )
-    @test fit_no_yadd isa NCPLS.AbstractNCPLSFit
-    @test fit_no_yadd isa NCPLS.NCPLSFit
-    @test size(fit_no_yadd.W0) == (2, 2, 2)
-    @test fit_no_yadd.Yadd_mean === nothing
-    @test fit_no_yadd.Yadd_std === nothing
+    @test mf_no_yadd isa NCPLS.NCPLSFit
+    @test size(mf_no_yadd.W0) == (2, 2, 2)
+    @test mf_no_yadd.W_modes === nothing
+    @test mf_no_yadd.W_multilinear_relerr === nothing
+    @test mf_no_yadd.W_multilinear_method === nothing
+    @test mf_no_yadd.W_multilinear_lambda === nothing
+    @test mf_no_yadd.Yadd_mean === nothing
+    @test mf_no_yadd.Yadd_std === nothing
 
     err_x_yprim = try
         NCPLS.fit_ncpls_core(
@@ -196,9 +214,9 @@ end
     @test occursin("Yprim and Yadd must have the same number of rows", sprint(showerror, err_yprim_yadd))
 end
 
-@testset "fit surfaces the current multilinear not-implemented branch" begin
+@testset "fit stores multilinear mode weights and diagnostics" begin
     model = NCPLS.NCPLSModel(
-        ncomponents = 1,
+        ncomponents = 2,
         center_X = true,
         scale_X = false,
         center_Yprim = true,
@@ -206,6 +224,7 @@ end
         center_Yadd = true,
         scale_Yadd = false,
         multilinear = true,
+        orthogonalize_mode_weights = false,
     )
     X = reshape(collect(1.0:24.0), 4, 3, 2)
     Y = Float64[
@@ -216,13 +235,94 @@ end
     ]
     Yadd = reshape([1.0, 2.0, 3.0, 4.0], :, 1)
 
-    err = try
-        NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
-        nothing
-    catch err
-        err
+    mf = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
+
+    @test mf isa NCPLS.NCPLSFit
+    @test mf.W_modes isa AbstractVector
+    @test length(mf.W_modes) == ndims(X) - 1
+    @test size(mf.W_modes[1]) == (size(X, 2), model.ncomponents)
+    @test size(mf.W_modes[2]) == (size(X, 3), model.ncomponents)
+    @test all(i -> isapprox(sqrt(sum(abs2, mf.W_modes[1][:, i])), 1.0; atol = 1e-12), 1:model.ncomponents)
+    @test all(i -> isapprox(sqrt(sum(abs2, mf.W_modes[2][:, i])), 1.0; atol = 1e-12), 1:model.ncomponents)
+    @test mf.W_multilinear_relerr isa AbstractVector
+    @test mf.W_multilinear_method isa AbstractVector
+    @test mf.W_multilinear_lambda isa AbstractVector
+    @test length(mf.W_multilinear_relerr) == model.ncomponents
+    @test length(mf.W_multilinear_method) == model.ncomponents
+    @test length(mf.W_multilinear_lambda) == model.ncomponents
+    @test all(m -> m == :svd, mf.W_multilinear_method)
+
+    for i in 1:model.ncomponents
+        Wi = selectdim(mf.W, ndims(mf.W), i)
+        expected = NCPLS.outer_tensor([mf.W_modes[1][:, i], mf.W_modes[2][:, i]])
+        @test Wi ≈ expected atol = 1e-10
     end
 
-    @test err isa ArgumentError
-    @test occursin("Multilinear loading weights option is not yet implemented.", sprint(showerror, err))
+    @test mf.R ≈ NCPLS.score_projection_tensors(mf.W, mf.P)
+    @test mf.B ≈ NCPLS.regression_coefficients(mf.R, mf.Q)
+end
+
+@testset "fit forwards multilinear control settings from the model" begin
+    model = NCPLS.NCPLSModel(
+        ncomponents = 1,
+        multilinear = true,
+        orthogonalize_mode_weights = false,
+        multilinear_maxiter = 1,
+        multilinear_tol = 0.0,
+        multilinear_init = :random,
+        multilinear_seed = 7,
+    )
+    X = reshape(collect(1.0:48.0), 4, 2, 3, 2)
+    Y = Float64[
+        1 0
+        0 1
+        1 0
+        0 1
+    ]
+
+    mf = NCPLS.fit_ncpls_core(model, X, Y; obs_weights = nothing)
+
+    W0_1 = selectdim(mf.W0, ndims(mf.W0), 1)
+    W_1 = NCPLS.loading_weights(W0_1, mf.c[:, 1])
+    W_modes_prev = [zeros(size(X, j + 1), 0) for j in 1:(ndims(X) - 1)]
+    direct = NCPLS.multilinear_loading_weight_tensor(
+        W_1,
+        W_modes_prev,
+        model,
+        Random.MersenneTwister(model.multilinear_seed),
+    )
+
+    @test mf.W_multilinear_method[1] == direct.method
+    @test mf.W_multilinear_relerr[1] ≈ direct.relerr
+    @test mf.W_multilinear_lambda[1] ≈ direct.lambda
+    @test selectdim(mf.W, ndims(mf.W), 1) ≈ direct.Wᵒ
+    @test mf.W_modes[1][:, 1] ≈ direct.factors[1]
+    @test mf.W_modes[2][:, 1] ≈ direct.factors[2]
+    @test mf.W_modes[3][:, 1] ≈ direct.factors[3]
+end
+
+@testset "fit accepts verbose multilinear fitting runtime control" begin
+    model = NCPLS.NCPLSModel(
+        ncomponents = 1,
+        multilinear = true,
+        multilinear_init = :random,
+        multilinear_maxiter = 1,
+        multilinear_tol = 0.0,
+        multilinear_seed = 3,
+    )
+    X = reshape(collect(1.0:48.0), 4, 2, 3, 2)
+    Y = Float64[
+        1 0
+        0 1
+        1 0
+        0 1
+    ]
+
+    mf = Logging.with_logger(Logging.NullLogger()) do
+        NCPLS.fit_ncpls_core(model, X, Y; obs_weights = nothing, verbose = true)
+    end
+
+    @test mf isa NCPLS.NCPLSFit
+    @test mf.W_modes isa AbstractVector
+    @test mf.W_multilinear_method[1] == :parafac
 end

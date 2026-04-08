@@ -1,3 +1,25 @@
+"""
+    fit(
+        m::NCPLSModel,
+        X::AbstractArray{<:Real},
+        Yprim::AbstractMatrix{<:Real};
+        Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
+        obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
+        verbose::Bool=false
+    ) -> NCPLSFit
+
+Fit an NCPLS model to predictors `X` and primary responses `Yprim`. The model object `m`
+controls the number of components, centering and scaling of `X`, `Yprim`, and `Yadd`,
+whether the multilinear loading-weight branch is used, whether mode weights are
+orthogonalized on previous components, and the PARAFAC control settings
+`multilinear_maxiter`, `multilinear_tol`, `multilinear_init`, and
+`multilinear_seed`.
+
+`Yadd` may be used to supply additional responses that influence the loading-weight
+calculation but are not predicted. `obs_weights` applies sample weights during
+preprocessing and the candidate-weight and CCA steps. If `verbose=true`, iteration
+progress from the PARAFAC step is printed when `m.multilinear` is enabled.
+"""
 function fit(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
@@ -7,12 +29,30 @@ function fit(
     fit_ncpls_core(m, X, Yprim; kwargs...)
 end
 
+"""
+    fit_ncpls_core(
+        m::NCPLSModel,
+        X::AbstractArray{<:Real},
+        Yprim::AbstractMatrix{<:Real};
+        Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
+        obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
+        verbose::Bool=false
+    ) -> NCPLSFit
+
+Fit an NCPLS model and return an `NCPLSFit`.
+
+This is the low-level fitting routine used by [`fit`](@ref). `Yadd` supplies
+additional responses for the loading-weight calculation, `obs_weights` gives
+optional observation weights, and `verbose` controls PARAFAC iteration logging
+in multilinear fits.
+"""
 function fit_ncpls_core(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
     Yprim::AbstractMatrix{<:Real};
     Yadd::T1=nothing,
-    obs_weights::T2=nothing
+    obs_weights::T2=nothing,
+    verbose::Bool=false
 ) where {
     T1<:Union{AbstractMatrix{<:Real}, Nothing},
     T2<:Union{AbstractVector{<:Real}, Nothing}
@@ -30,6 +70,21 @@ function fit_ncpls_core(
     W0 = Array{Float64}(undef, size(d.X)[2:end]..., q_comb, m.ncomponents)
     c = Matrix{Float64}(undef, q_comb, m.ncomponents)
     rho = Vector{Float64}(undef, m.ncomponents)
+    if m.multilinear
+        W_modes = [
+            Array{Float64}(undef, size(d.X, j + 1), m.ncomponents)
+            for j in 1:(ndims(d.X) - 1)
+        ]
+        W_multilinear_relerr = Vector{Float64}(undef, m.ncomponents)
+        W_multilinear_method = Vector{Symbol}(undef, m.ncomponents)
+        W_multilinear_lambda = Vector{Float64}(undef, m.ncomponents)
+    else
+        W_modes = nothing
+        W_multilinear_relerr = nothing
+        W_multilinear_method = nothing
+        W_multilinear_lambda = nothing
+    end
+    rng = m.multilinear ? MersenneTwister(m.multilinear_seed) : nothing
 
     # Apply observation weights consistently with covariance weighting (sqrt for covariance).
     cca_obs_weights = isnothing(obs_weights) ? nothing : sqrt.(obs_weights)
@@ -57,17 +112,28 @@ function fit_ncpls_core(
         # W = W₀ ⓐ₁ C
         W = loading_weights(W₀, c[:, i])
 
-        if m.multilinear  # multilinear branch
-            throw(ArgumentError("Multilinear loading weights option is not yet implemented."))
+        if m.multilinear
+            W_modes_prev = [W_modes[j][:, 1:i-1] for j in eachindex(W_modes)]
+
+            ml = multilinear_loading_weight_tensor(W, W_modes_prev, m, rng; verbose=verbose)
+
+            for j in eachindex(W_modes)
+                W_modes[j][:, i] = ml.factors[j]
+            end
+            W_multilinear_relerr[i] = ml.relerr
+            W_multilinear_method[i] = ml.method
+            W_multilinear_lambda[i] = ml.lambda
+
+            Wᵒ = ml.Wᵒ
         else # unfolded branch
-            # Wᵒ := W
-            W⁰ = W
+            # For unfolded analyses, the manuscript bypasses the switching part and sets Wᵒ := W.
+            Wᵒ = W
         end
 
-        selectdim(W_A, ndims(W_A), i) .= W⁰
+        selectdim(W_A, ndims(W_A), i) .= Wᵒ
 
         # t = X ⓓ Wᵒ
-        t = score_vector(d.X, W⁰)
+        t = score_vector(d.X, Wᵒ)
         # t = X ⓓ Wᵒ
         t  = orthogonalize_on_accumulated_scores(t,  T[:, 1:i-1])
         # t := t / ||t||
@@ -100,10 +166,14 @@ function fit_ncpls_core(
         P,
         Q,
         W_A,
+        W_modes,
         c,
         W0,
         rho,
         Y,
+        W_multilinear_relerr,
+        W_multilinear_method,
+        W_multilinear_lambda,
         d.X_mean,
         d.X_std,
         d.Yprim_mean,

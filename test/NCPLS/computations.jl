@@ -1,3 +1,5 @@
+import Random
+
 @testset "candidate_loading_weights returns matrix-shaped weights for matrix X" begin
     X = Float64[
         1 2
@@ -646,8 +648,18 @@ end
     ]
     λ = 4.5
     X = λ .* NCPLS.outer_tensor(factors)
+    model = NCPLS.NCPLSModel(
+        multilinear = true,
+        multilinear_maxiter = 200,
+        multilinear_tol = 1e-12,
+        multilinear_init = :hosvd,
+    )
 
-    fit = NCPLS.parafac_rank1(X; maxiter = 200, tol = 1e-12, init = :hosvd)
+    fit = NCPLS.parafac_rank1(
+        X,
+        model,
+        Random.MersenneTwister(model.multilinear_seed),
+    )
 
     @test fit.converged === true
     @test size(fit.Xhat) == size(X)
@@ -658,8 +670,13 @@ end
 end
 
 @testset "parafac_rank1 rejects zero tensors" begin
+    model = NCPLS.NCPLSModel(multilinear = true)
     err = try
-        NCPLS.parafac_rank1(zeros(2, 2, 2))
+        NCPLS.parafac_rank1(
+            zeros(2, 2, 2),
+            model,
+            Random.MersenneTwister(model.multilinear_seed),
+        )
         nothing
     catch err
         err
@@ -669,8 +686,11 @@ end
 end
 
 @testset "multilinear_weights handles vector, matrix, and tensor inputs" begin
+    model = NCPLS.NCPLSModel(multilinear = true)
+    rng = Random.MersenneTwister(model.multilinear_seed)
+
     v = [3.0, 4.0]
-    mv = NCPLS.multilinear_weights(v)
+    mv = NCPLS.multilinear_weights(v, model, rng)
     @test mv.method == :vector
     @test mv.W_rank1 ≈ v / 5.0
     @test mv.relerr == 0.0
@@ -679,7 +699,7 @@ end
     s = 3.0
     r = [2.0, -1.0, 1.0]
     M = s .* (u * r')
-    mm = NCPLS.multilinear_weights(M)
+    mm = NCPLS.multilinear_weights(M, model, rng)
     @test mm.method == :svd
     @test size(mm.W_rank1) == size(M)
     @test mm.W_rank1 ≈ M atol = 1e-8
@@ -692,10 +712,99 @@ end
         [2.0, 1.0],
     ]
     T = 2.5 .* NCPLS.outer_tensor(factors)
-    mt = NCPLS.multilinear_weights(T; maxiter = 200, tol = 1e-12)
+    parafac_model = NCPLS.NCPLSModel(
+        multilinear = true,
+        multilinear_maxiter = 200,
+        multilinear_tol = 1e-12,
+    )
+    mt = NCPLS.multilinear_weights(
+        T,
+        parafac_model,
+        Random.MersenneTwister(parafac_model.multilinear_seed),
+    )
     @test mt.method == :parafac
     @test size(mt.W_rank1) == size(T)
     @test mt.W_rank1 ≈ T atol = 1e-8
     @test mt.relerr ≤ 1e-8
     @test length(mt.factors) == 3
+end
+
+@testset "multilinear_loading_weight_tensor returns normalized factors and outer-product Wᵒ" begin
+    W = Float64[
+        2.0 4.0
+        1.0 2.0
+        0.0 0.0
+    ]
+    W_modes_prev = [zeros(3, 0), zeros(2, 0)]
+    model = NCPLS.NCPLSModel(multilinear = true)
+
+    ml = NCPLS.multilinear_loading_weight_tensor(
+        W,
+        W_modes_prev,
+        model,
+        Random.MersenneTwister(model.multilinear_seed),
+    )
+
+    @test ml.method == :svd
+    @test length(ml.factors) == 2
+    @test size(ml.Wᵒ) == size(W)
+    @test sqrt(sum(abs2, ml.factors[1])) ≈ 1.0 atol = 1e-12
+    @test sqrt(sum(abs2, ml.factors[2])) ≈ 1.0 atol = 1e-12
+    @test ml.Wᵒ ≈ NCPLS.outer_tensor(ml.factors) atol = 1e-12
+    @test ml.relerr ≤ 1e-8
+end
+
+@testset "multilinear_loading_weight_tensor orthogonalizes mode weights when requested" begin
+    W = Float64[
+        1.0 1.0
+        0.0 0.0
+        0.0 0.0
+    ]
+    prev_mode1 = zeros(3, 0)
+    prev_mode2 = reshape([1.0, 0.0], 2, 1)
+    model = NCPLS.NCPLSModel(
+        multilinear = true,
+        orthogonalize_mode_weights = true,
+    )
+
+    ml = NCPLS.multilinear_loading_weight_tensor(
+        W,
+        [prev_mode1, prev_mode2],
+        model,
+        Random.MersenneTwister(model.multilinear_seed),
+    )
+
+    @test length(ml.factors) == 2
+    @test prev_mode2' * ml.factors[2] ≈ zeros(1) atol = 1e-12
+    @test sqrt(sum(abs2, ml.factors[2])) ≈ 1.0 atol = 1e-12
+    @test ml.Wᵒ ≈ NCPLS.outer_tensor(ml.factors) atol = 1e-12
+end
+
+@testset "multilinear_loading_weight_tensor uses multilinear settings from the model" begin
+    W = rand(2, 2, 2)
+    W_modes_prev = [zeros(2, 0), zeros(2, 0), zeros(2, 0)]
+    model = NCPLS.NCPLSModel(
+        multilinear = true,
+        multilinear_maxiter = 1,
+        multilinear_tol = 0.0,
+        multilinear_init = :random,
+        multilinear_seed = 11,
+    )
+
+    first = NCPLS.multilinear_loading_weight_tensor(
+        W,
+        W_modes_prev,
+        model,
+        Random.MersenneTwister(model.multilinear_seed),
+    )
+    second = NCPLS.multilinear_loading_weight_tensor(
+        W,
+        W_modes_prev,
+        model,
+        Random.MersenneTwister(model.multilinear_seed),
+    )
+
+    @test first.method == :parafac
+    @test first.Wᵒ ≈ second.Wᵒ
+    @test all(first.factors[j] ≈ second.factors[j] for j in eachindex(first.factors))
 end

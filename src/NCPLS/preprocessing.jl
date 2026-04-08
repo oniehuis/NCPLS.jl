@@ -1,3 +1,15 @@
+"""
+    preprocess(
+        m::NCPLSModel,
+        X::AbstractArray{<:Real},
+        Yprim::AbstractMatrix{<:Real},
+        Yadd::Union{AbstractMatrix{<:Real}, Nothing},
+        obs_weights::Union{AbstractVector{<:Real}, Nothing}
+    )
+
+Prepare predictors and responses for NCPLS by converting them to `Float64`, validating
+their dimensions, and applying the centering and scaling options stored in `m`.
+"""
 function preprocess(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
@@ -47,6 +59,17 @@ function preprocess(
     )
 end
 
+"""
+    centerscale(
+        X::AbstractArray{<:Real},
+        center::Bool,
+        scale::Bool,
+        obs_weights::Union{AbstractVector{<:Real}, Nothing}
+    )
+
+Center and scale `X` along the sample dimension. If `obs_weights` is provided, weighted
+means and weighted standard deviations are used.
+"""
 function centerscale(
     X::AbstractArray{<:Real},
     center::Bool,
@@ -113,6 +136,15 @@ function centerscale(
     Xwork, dropdims(μ; dims=1), dropdims(σ; dims=1)
 end
 
+"""
+    validate_obs_weights(
+        X::AbstractArray{<:Real},
+        obs_weights::Union{AbstractVector{<:Real}, Nothing}
+    )
+
+Validate observation weights against the sample dimension of `X`. Returns `nothing` if
+the weights are valid or absent.
+"""
 function validate_obs_weights(
     X::AbstractArray{<:Real},
     obs_weights::Union{AbstractVector{<:Real}, Nothing}
@@ -134,4 +166,9 @@ function validate_obs_weights(
     nothing
 end
 
+"""
+    float64(X::AbstractArray{<:Real})
+
+Convert `X` to `Float64` unless it already has element type `Float64`.
+"""
 float64(X::AbstractArray{T}) where {T<:Real} = T ≡ Float64 ? X : Float64.(X)
