@@ -89,9 +89,6 @@ end
         center_X = true,
         scale_X = false,
         center_Yprim = true,
-        scale_Yprim = false,
-        center_Yadd = true,
-        scale_Yadd = false,
     )
     X = reshape(collect(1.0:24.0), 4, 3, 2)
     Yprim = Float64[
@@ -158,9 +155,6 @@ end
         center_X = true,
         scale_X = false,
         center_Yprim = true,
-        scale_Yprim = false,
-        center_Yadd = true,
-        scale_Yadd = false,
     )
     X = reshape(collect(1.0:24.0), 4, 3, 2)
     Yprim = Float64[

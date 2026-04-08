@@ -1,4 +1,4 @@
-function mock_matrix_fit(; with_yadd::Bool=true)
+function mock_matrix_fit()
     model = NCPLS.NCPLSModel(ncomponents = 2)
     NCPLS.NCPLSFit(
         model,
@@ -16,16 +16,16 @@ function mock_matrix_fit(; with_yadd::Bool=true)
         nothing,
         nothing,
         nothing,
+        nothing,
+        nothing,
         [1.0, 2.0],
         [2.0, 4.0],
         [10.0],
         [5.0],
-        with_yadd ? [3.0] : nothing,
-        with_yadd ? [7.0] : nothing,
     )
 end
 
-function mock_tensor_fit(; with_yadd::Bool=true)
+function mock_tensor_fit()
     model = NCPLS.NCPLSModel(ncomponents = 2)
     NCPLS.NCPLSFit(
         model,
@@ -43,12 +43,12 @@ function mock_tensor_fit(; with_yadd::Bool=true)
         nothing,
         nothing,
         nothing,
+        nothing,
+        nothing,
         [1.0 2.0; 3.0 4.0],
         [0.5 1.5; 2.5 3.5],
         [2.0, 5.0],
         [1.0, 4.0],
-        with_yadd ? [3.0] : nothing,
-        with_yadd ? [2.0] : nothing,
     )
 end
 
@@ -58,9 +58,6 @@ end
     @test model.center_X === true
     @test model.scale_X === false
     @test model.center_Yprim === true
-    @test model.scale_Yprim === false
-    @test model.center_Yadd === true
-    @test model.scale_Yadd === false
     @test model.multilinear === false
     @test model.orthogonalize_mode_weights === false
     @test model.multilinear_maxiter == 500
@@ -73,9 +70,6 @@ end
         center_X = false,
         scale_X = true,
         center_Yprim = false,
-        scale_Yprim = true,
-        center_Yadd = false,
-        scale_Yadd = true,
         multilinear = true,
         orthogonalize_mode_weights = true,
         multilinear_maxiter = 50,
@@ -87,9 +81,6 @@ end
     @test custom.center_X === false
     @test custom.scale_X === true
     @test custom.center_Yprim === false
-    @test custom.scale_Yprim === true
-    @test custom.center_Yadd === false
-    @test custom.scale_Yadd === true
     @test custom.multilinear === true
     @test custom.orthogonalize_mode_weights === true
     @test custom.multilinear_maxiter == 50
@@ -110,9 +101,6 @@ end
         center_X = false,
         scale_X = true,
         center_Yprim = true,
-        scale_Yprim = true,
-        center_Yadd = false,
-        scale_Yadd = true,
         multilinear = true,
         orthogonalize_mode_weights = true,
         multilinear_maxiter = 75,
@@ -149,8 +137,8 @@ end
     @test matrix_mf.W_multilinear_relerr === nothing
     @test matrix_mf.W_multilinear_method === nothing
     @test matrix_mf.W_multilinear_lambda === nothing
-    @test matrix_mf.Yadd_mean == [3.0]
-    @test matrix_mf.Yadd_std == [7.0]
+    @test matrix_mf.W_multilinear_niter === nothing
+    @test matrix_mf.W_multilinear_converged === nothing
 
     tensor_mf = mock_tensor_fit()
     @test tensor_mf isa NCPLS.NCPLSFit
@@ -164,10 +152,6 @@ end
     @test size(tensor_mf.W0) == (2, 2, 2, 2)
     @test size(tensor_mf.X_mean) == (2, 2)
     @test size(tensor_mf.X_std) == (2, 2)
-
-    no_yadd_mf = mock_matrix_fit(with_yadd = false)
-    @test no_yadd_mf.Yadd_mean === nothing
-    @test no_yadd_mf.Yadd_std === nothing
 end
 
 @testset "NCPLSFit show methods" begin
@@ -203,7 +187,7 @@ end
 end
 
 @testset "NCPLSFit getters" begin
-    mf = mock_matrix_fit(with_yadd = false)
+    mf = mock_matrix_fit()
 
     @test NCPLS.xmean(mf) === mf.X_mean
     @test NCPLS.xstd(mf) === mf.X_std

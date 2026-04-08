@@ -8,7 +8,9 @@
     )
 
 Prepare predictors and responses for NCPLS by converting them to `Float64`, validating
-their dimensions, and applying the centering and scaling options stored in `m`.
+their dimensions, and applying the centering and scaling options stored in `m`. `Yprim`
+is centered but not scaled. `Yadd` is only converted to `Float64` and validated against
+`Yprim`.
 """
 function preprocess(
     m::NCPLSModel,
@@ -30,16 +32,13 @@ function preprocess(
     X, X_mean, X_std = centerscale(float64(X), m.center_X, m.scale_X, obs_weights)
 
     Yprim, Yprim_mean, Yprim_std = 
-        centerscale(float64(Yprim), m.center_Yprim, m.scale_Yprim, obs_weights)
+        centerscale(float64(Yprim), m.center_Yprim, false, obs_weights)
 
-    if isnothing(Yadd)
-        Yadd, Yadd_mean, Yadd_std = nothing, nothing, nothing
-    else
+    if !isnothing(Yadd)
         nrow_Yadd, _ = size(Yadd)
         nrow_Yprim == nrow_Yadd || throw(DimensionMismatch(
             "Yprim and Yadd must have the same number of rows"))
-        Yadd, Yadd_mean, Yadd_std = 
-            centerscale(float64(Yadd), m.center_Yadd, m.scale_Yadd, obs_weights)
+        Yadd = float64(Yadd)
     end
     
     (   # Preprocessed predictors
@@ -54,8 +53,6 @@ function preprocess(
 
         # Preprocessed additional responses
         Yadd=Yadd,
-        Yadd_mean=Yadd_mean,
-        Yadd_std=Yadd_std
     )
 end
 

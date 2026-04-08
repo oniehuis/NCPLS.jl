@@ -2,17 +2,14 @@
     NCPLSModel
 
 Model specification passed to `fit`. An `NCPLSModel` stores the centering and scaling
-options, the number of extracted components, and the settings that control the
-multilinear loading-weight branch.
+options for `X`, the centering option for `Yprim`, the number of extracted components,
+and the settings that control the multilinear loading-weight branch.
 """
 struct NCPLSModel
     ncomponents::Int
     center_X::Bool
     scale_X::Bool
     center_Yprim::Bool
-    scale_Yprim::Bool
-    center_Yadd::Bool
-    scale_Yadd::Bool
     multilinear::Bool
     orthogonalize_mode_weights::Bool
     multilinear_maxiter::Int
@@ -27,9 +24,6 @@ end
         center_X::Bool=true,
         scale_X::Bool=false,
         center_Yprim::Bool=true,
-        scale_Yprim::Bool=false,
-        center_Yadd::Bool=true,
-        scale_Yadd::Bool=false,
         multilinear::Bool=false,
         orthogonalize_mode_weights::Bool=false,
         multilinear_maxiter::Int=500,
@@ -51,9 +45,6 @@ function NCPLSModel(;
     center_X::Bool=true,
     scale_X::Bool=false,
     center_Yprim::Bool=true,
-    scale_Yprim::Bool=false,
-    center_Yadd::Bool=true,
-    scale_Yadd::Bool=false,
     multilinear::Bool=false,
     orthogonalize_mode_weights::Bool=false,
     multilinear_maxiter::Int=500,
@@ -75,9 +66,6 @@ function NCPLSModel(;
         center_X,
         scale_X,
         center_Yprim,
-        scale_Yprim,
-        center_Yadd,
-        scale_Yadd,
         multilinear,
         orthogonalize_mode_weights,
         multilinear_maxiter,
@@ -93,9 +81,6 @@ function Base.show(io::IO, m::NCPLSModel)
         ", center_X=", m.center_X,
         ", scale_X=", m.scale_X,
         ", center_Yprim=", m.center_Yprim,
-        ", scale_Yprim=", m.scale_Yprim,
-        ", center_Yadd=", m.center_Yadd,
-        ", scale_Yadd=", m.scale_Yadd,
         ", multilinear=", m.multilinear,
         ", orthogonalize_mode_weights=", m.orthogonalize_mode_weights,
         ", multilinear_maxiter=", m.multilinear_maxiter,
@@ -111,9 +96,6 @@ function Base.show(io::IO, ::MIME"text/plain", m::NCPLSModel)
     println(io, "  center_X: ", m.center_X)
     println(io, "  scale_X: ", m.scale_X)
     println(io, "  center_Yprim: ", m.center_Yprim)
-    println(io, "  scale_Yprim: ", m.scale_Yprim)
-    println(io, "  center_Yadd: ", m.center_Yadd)
-    println(io, "  scale_Yadd: ", m.scale_Yadd)
     println(io, "  multilinear: ", m.multilinear)
     println(io, "  orthogonalize_mode_weights: ", m.orthogonalize_mode_weights)
     println(io, "  multilinear_maxiter: ", m.multilinear_maxiter)
@@ -134,6 +116,8 @@ abstract type AbstractNCPLSFit end
     coef(mf::AbstractNCPLSFit, ncomps::Integer)
 
 Return the regression coefficients for the final or requested number of components.
+The returned tensor acts on preprocessed predictors, i.e. on `X` after the centering and
+optional scaling stored in the fitted model have been applied.
 """
 coef(mf::AbstractNCPLSFit) = coef(mf, ncomponents(mf))
 coef(mf::AbstractNCPLSFit, ncomps::Integer) = @views selectdim(
@@ -172,7 +156,9 @@ ystd(mf::AbstractNCPLSFit) = mf.Yprim_std
 
 Fitted NCPLS model returned by `fit`. An `NCPLSFit` stores the regression and projection
 objects, component-wise scores and loadings, multilinear diagnostics, and the
-preprocessing statistics needed for prediction and inspection.
+preprocessing statistics needed for prediction and inspection. For multilinear fits, the
+stored diagnostics include the PARAFAC approximation error, method, scaling, iteration
+count, and convergence flag for each extracted component.
 """
 struct NCPLSFit{
     TModel<:NCPLSModel,
@@ -190,9 +176,10 @@ struct NCPLSFit{
     TWMLRelerr,
     TWMLMethod,
     TWMLLambda,
+    TWMLNiter,
+    TWMLConverged,
     TXStat,
     TYStat,
-    TYAddStat,
 } <: AbstractNCPLSFit
 
     model::TModel
@@ -210,12 +197,12 @@ struct NCPLSFit{
     W_multilinear_relerr::TWMLRelerr
     W_multilinear_method::TWMLMethod
     W_multilinear_lambda::TWMLLambda
+    W_multilinear_niter::TWMLNiter
+    W_multilinear_converged::TWMLConverged
     X_mean::TXStat
     X_std::TXStat
     Yprim_mean::TYStat
     Yprim_std::TYStat
-    Yadd_mean::TYAddStat
-    Yadd_std::TYAddStat
 end
 
 function Base.show(io::IO, mf::NCPLSFit)

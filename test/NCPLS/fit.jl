@@ -7,9 +7,6 @@ import Logging
         center_X = true,
         scale_X = true,
         center_Yprim = true,
-        scale_Yprim = true,
-        center_Yadd = true,
-        scale_Yadd = true,
     )
     X = Float64[
         1 2
@@ -44,6 +41,8 @@ import Logging
     @test mf.W_multilinear_relerr === nothing
     @test mf.W_multilinear_method === nothing
     @test mf.W_multilinear_lambda === nothing
+    @test mf.W_multilinear_niter === nothing
+    @test mf.W_multilinear_converged === nothing
     @test vec(sum(mf.T .^ 2; dims = 1)) ≈ ones(2) atol = 1e-12
     @test mf.R ≈ NCPLS.score_projection_tensors(mf.W, mf.P)
     @test mf.B ≈ NCPLS.regression_coefficients(mf.R, mf.Q)
@@ -51,8 +50,6 @@ import Logging
     @test mf.X_std ≈ d.X_std
     @test mf.Yprim_mean ≈ d.Yprim_mean
     @test mf.Yprim_std ≈ d.Yprim_std
-    @test mf.Yadd_mean ≈ d.Yadd_mean
-    @test mf.Yadd_std ≈ d.Yadd_std
 end
 
 @testset "fit_ncpls_core returns fitted arrays for tensors" begin
@@ -61,9 +58,6 @@ end
         center_X = true,
         scale_X = true,
         center_Yprim = true,
-        scale_Yprim = false,
-        center_Yadd = true,
-        scale_Yadd = false,
     )
     X = reshape(collect(1.0:24.0), 4, 3, 2)
     Y = Float64[
@@ -92,6 +86,8 @@ end
     @test mf.W_multilinear_relerr === nothing
     @test mf.W_multilinear_method === nothing
     @test mf.W_multilinear_lambda === nothing
+    @test mf.W_multilinear_niter === nothing
+    @test mf.W_multilinear_converged === nothing
     @test vec(sum(mf.T .^ 2; dims = 1)) ≈ ones(3) atol = 1e-12
     @test mf.R ≈ NCPLS.score_projection_tensors(mf.W, mf.P)
     @test mf.B ≈ NCPLS.regression_coefficients(mf.R, mf.Q)
@@ -100,8 +96,6 @@ end
     @test mf.X_std ≈ d.X_std
     @test mf.Yprim_mean ≈ d.Yprim_mean
     @test mf.Yprim_std ≈ d.Yprim_std
-    @test mf.Yadd_mean ≈ d.Yadd_mean
-    @test mf.Yadd_std ≈ d.Yadd_std
 end
 
 @testset "fit wrapper delegates to fit_ncpls_core" begin
@@ -110,9 +104,6 @@ end
         center_X = true,
         scale_X = false,
         center_Yprim = true,
-        scale_Yprim = true,
-        center_Yadd = false,
-        scale_Yadd = true,
     )
     X = Float64[
         2 1 0
@@ -149,8 +140,6 @@ end
     @test via_wrapper.X_std ≈ via_core.X_std
     @test via_wrapper.Yprim_mean ≈ via_core.Yprim_mean
     @test via_wrapper.Yprim_std ≈ via_core.Yprim_std
-    @test via_wrapper.Yadd_mean ≈ via_core.Yadd_mean
-    @test via_wrapper.Yadd_std ≈ via_core.Yadd_std
 end
 
 @testset "fit paths handle optional Yadd and surface preprocessing validation errors" begin
@@ -172,8 +161,8 @@ end
     @test mf_no_yadd.W_multilinear_relerr === nothing
     @test mf_no_yadd.W_multilinear_method === nothing
     @test mf_no_yadd.W_multilinear_lambda === nothing
-    @test mf_no_yadd.Yadd_mean === nothing
-    @test mf_no_yadd.Yadd_std === nothing
+    @test mf_no_yadd.W_multilinear_niter === nothing
+    @test mf_no_yadd.W_multilinear_converged === nothing
 
     err_x_yprim = try
         NCPLS.fit_ncpls_core(
@@ -220,9 +209,6 @@ end
         center_X = true,
         scale_X = false,
         center_Yprim = true,
-        scale_Yprim = false,
-        center_Yadd = true,
-        scale_Yadd = false,
         multilinear = true,
         orthogonalize_mode_weights = false,
     )
@@ -247,10 +233,16 @@ end
     @test mf.W_multilinear_relerr isa AbstractVector
     @test mf.W_multilinear_method isa AbstractVector
     @test mf.W_multilinear_lambda isa AbstractVector
+    @test mf.W_multilinear_niter isa AbstractVector
+    @test mf.W_multilinear_converged isa AbstractVector
     @test length(mf.W_multilinear_relerr) == model.ncomponents
     @test length(mf.W_multilinear_method) == model.ncomponents
     @test length(mf.W_multilinear_lambda) == model.ncomponents
+    @test length(mf.W_multilinear_niter) == model.ncomponents
+    @test length(mf.W_multilinear_converged) == model.ncomponents
     @test all(m -> m == :svd, mf.W_multilinear_method)
+    @test all(==(0), mf.W_multilinear_niter)
+    @test all(identity, mf.W_multilinear_converged)
 
     for i in 1:model.ncomponents
         Wi = selectdim(mf.W, ndims(mf.W), i)
@@ -295,6 +287,8 @@ end
     @test mf.W_multilinear_method[1] == direct.method
     @test mf.W_multilinear_relerr[1] ≈ direct.relerr
     @test mf.W_multilinear_lambda[1] ≈ direct.lambda
+    @test mf.W_multilinear_niter[1] == direct.niter
+    @test mf.W_multilinear_converged[1] == direct.converged
     @test selectdim(mf.W, ndims(mf.W), 1) ≈ direct.Wᵒ
     @test mf.W_modes[1][:, 1] ≈ direct.factors[1]
     @test mf.W_modes[2][:, 1] ≈ direct.factors[2]
@@ -325,4 +319,6 @@ end
     @test mf isa NCPLS.NCPLSFit
     @test mf.W_modes isa AbstractVector
     @test mf.W_multilinear_method[1] == :parafac
+    @test mf.W_multilinear_niter[1] == model.multilinear_maxiter
+    @test mf.W_multilinear_converged[1] === false
 end

@@ -17,12 +17,12 @@ function mock_matrix_fit()
         nothing,
         nothing,
         nothing,
+        nothing,
+        nothing,
         [1.0, 2.0],
         [2.0, 4.0],
         [10.0],
         [5.0],
-        nothing,
-        nothing,
     )
 end
 
@@ -43,12 +43,12 @@ function mock_tensor_fit()
         nothing,
         nothing,
         nothing,
+        nothing,
+        nothing,
         [1.0 2.0; 3.0 4.0],
         [2.0 4.0; 5.0 10.0],
         [2.0, 5.0],
         [1.0, 4.0],
-        nothing,
-        nothing,
     )
 end
 
@@ -70,7 +70,6 @@ end
         center_X = true,
         scale_X = true,
         center_Yprim = true,
-        scale_Yprim = true,
     )
 
     X = randn(rng, 6, 4)
@@ -125,7 +124,6 @@ end
         center_X = true,
         scale_X = true,
         center_Yprim = true,
-        scale_Yprim = false,
     )
 
     X = randn(rng, 6, 3, 2)

@@ -3,6 +3,7 @@ module NCPLS
 using LinearAlgebra
 using Random
 using Statistics
+import CPPLS
 import StatsAPI: fit, predict, fitted, coef, residuals
 import CPPLS: cca_coeffs_and_corr
 

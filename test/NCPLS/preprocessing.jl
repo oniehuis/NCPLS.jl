@@ -81,15 +81,12 @@ end
     @test sqrt.(sum(w .* X_cs .^ 2, dims = 1) / wsum) ≈ ones(1, 2, 2)
 end
 
-@testset "preprocess returns aligned statistics for matrices and tensors" begin
+@testset "preprocess returns aligned arrays for matrices and tensors" begin
     model = NCPLS.NCPLSModel(
         ncomponents = 2,
         center_X = true,
         scale_X = true,
         center_Yprim = true,
-        scale_Yprim = true,
-        center_Yadd = true,
-        scale_Yadd = true,
     )
 
     X_matrix = Float64[
@@ -117,15 +114,12 @@ end
     @test size(d_matrix.X_std) == (2,)
     @test size(d_matrix.Yprim_mean) == (2,)
     @test size(d_matrix.Yprim_std) == (2,)
-    @test size(d_matrix.Yadd_mean) == (1,)
-    @test size(d_matrix.Yadd_std) == (1,)
     @test Ycomb_matrix == hcat(d_matrix.Yprim, d_matrix.Yadd)
+    @test d_matrix.Yadd == Float64.(Yadd)
 
     w_matrix = reshape(weights, :, 1)
     @test sum(d_matrix.X .* w_matrix, dims = 1) ./ sum(weights) ≈ zeros(1, 2) atol=1e-12
     @test sum(d_matrix.Yprim .* w_matrix, dims = 1) ./ sum(weights) ≈ zeros(1, 2) atol=1e-12
-    @test sum(d_matrix.Yadd .* w_matrix, dims = 1) ./ sum(weights) ≈ zeros(1, 1) atol=1e-12
-    @test sqrt.(sum(w_matrix .* d_matrix.Yadd .^ 2, dims = 1) / sum(weights)) ≈ ones(1, 1)
 
     X_tensor = reshape(collect(1.0:24.0), 4, 3, 2)
     d_tensor = NCPLS.preprocess(model, X_tensor, Y, Yadd, nothing)
@@ -135,19 +129,15 @@ end
     @test size(d_tensor.X_std) == (3, 2)
     @test size(d_tensor.Yprim_mean) == (2,)
     @test size(d_tensor.Yprim_std) == (2,)
-    @test size(d_tensor.Yadd_mean) == (1,)
-    @test size(d_tensor.Yadd_std) == (1,)
     @test size(Ycomb_tensor) == (4, 3)
     @test Ycomb_tensor == hcat(d_tensor.Yprim, d_tensor.Yadd)
     @test sum(d_tensor.X, dims = 1) ≈ zeros(1, 3, 2) atol=1e-12
     @test vec(sum(d_tensor.Yprim, dims = 1)) ≈ [0.0, 0.0] atol=1e-12
-    @test vec(sum(d_tensor.Yadd, dims = 1)) ≈ [0.0] atol=1e-12
+    @test d_tensor.Yadd == Float64.(Yadd)
 
     d_no_yadd = NCPLS.preprocess(model, X_tensor, Y, nothing, nothing)
     @test size(d_no_yadd.Yprim) == size(Y)
     @test d_no_yadd.Yadd === nothing
-    @test d_no_yadd.Yadd_mean === nothing
-    @test d_no_yadd.Yadd_std === nothing
 
     err_x_yprim = try
         NCPLS.preprocess(model, X_tensor, Y[1:3, :], Yadd, nothing)

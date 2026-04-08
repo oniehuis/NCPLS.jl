@@ -287,6 +287,8 @@ function multilinear_loading_weight_tensor(
         lambda = ml.lambda,
         relerr = ml.relerr,
         method = ml.method,
+        niter = ml.niter,
+        converged = ml.converged,
     )
 end
 
@@ -296,7 +298,8 @@ end
 Extract multilinear mode weights from `W` using the control settings stored in `m`. A
 vector is normalized directly, a matrix is reduced by its dominant rank-1 SVD pair, and
 an array with three or more dimensions is approximated by a rank-1 PARAFAC model. The
-returned named tuple contains `factors`, `W_rank1`, `lambda`, `relerr`, and `method`.
+returned named tuple contains `factors`, `W_rank1`, `lambda`, `relerr`, `method`,
+`niter`, and `converged`.
 """
 function multilinear_weights(
     W::AbstractArray, 
@@ -318,6 +321,8 @@ function multilinear_weights(
             lambda = 1.0,
             relerr = 0.0,
             method = :vector,
+            niter = 0,
+            converged = true,
         )
     elseif d == 2
         U, S, V = svd(Matrix{Float64}(W))
@@ -332,6 +337,8 @@ function multilinear_weights(
             lambda = λ,
             relerr = norm(W .- What) / norm(W),
             method = :svd,
+            niter = 0,
+            converged = true,
         )
     else
         pf = parafac_rank1(Array{Float64}(W), m, rng; verbose=verbose)
@@ -343,6 +350,8 @@ function multilinear_weights(
             lambda = pf.lambda,
             relerr = pf.relerr,
             method = :parafac,
+            niter = pf.niter,
+            converged = pf.converged,
         )
     end
 end

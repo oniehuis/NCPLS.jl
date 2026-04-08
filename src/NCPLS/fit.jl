@@ -9,7 +9,7 @@
     ) -> NCPLSFit
 
 Fit an NCPLS model to predictors `X` and primary responses `Yprim`. The model object `m`
-controls the number of components, centering and scaling of `X`, `Yprim`, and `Yadd`,
+controls the number of components, centering and scaling of `X`, centering of `Yprim`,
 whether the multilinear loading-weight branch is used, whether mode weights are
 orthogonalized on previous components, and the PARAFAC control settings
 `multilinear_maxiter`, `multilinear_tol`, `multilinear_init`, and
@@ -78,11 +78,15 @@ function fit_ncpls_core(
         W_multilinear_relerr = Vector{Float64}(undef, m.ncomponents)
         W_multilinear_method = Vector{Symbol}(undef, m.ncomponents)
         W_multilinear_lambda = Vector{Float64}(undef, m.ncomponents)
+        W_multilinear_niter = Vector{Int}(undef, m.ncomponents)
+        W_multilinear_converged = Vector{Bool}(undef, m.ncomponents)
     else
         W_modes = nothing
         W_multilinear_relerr = nothing
         W_multilinear_method = nothing
         W_multilinear_lambda = nothing
+        W_multilinear_niter = nothing
+        W_multilinear_converged = nothing
     end
     rng = m.multilinear ? MersenneTwister(m.multilinear_seed) : nothing
 
@@ -94,7 +98,7 @@ function fit_ncpls_core(
     Y = copy(d.Yprim)
     for i = 1:m.ncomponents
         # W₀ = Xᵗ_d ⓐ₁ [Y Yadditional]
-        Ycomb = isnothing(Yadd) ? Y : hcat(Y, d.Yadd)
+        Ycomb = isnothing(d.Yadd) ? Y : hcat(Y, d.Yadd)
         W₀ = candidate_loading_weights(d.X, Ycomb, obs_weights)
         selectdim(W0, ndims(W0), i) .= W₀
 
@@ -123,6 +127,8 @@ function fit_ncpls_core(
             W_multilinear_relerr[i] = ml.relerr
             W_multilinear_method[i] = ml.method
             W_multilinear_lambda[i] = ml.lambda
+            W_multilinear_niter[i] = ml.niter
+            W_multilinear_converged[i] = ml.converged
 
             Wᵒ = ml.Wᵒ
         else # unfolded branch
@@ -174,11 +180,11 @@ function fit_ncpls_core(
         W_multilinear_relerr,
         W_multilinear_method,
         W_multilinear_lambda,
+        W_multilinear_niter,
+        W_multilinear_converged,
         d.X_mean,
         d.X_std,
         d.Yprim_mean,
         d.Yprim_std,
-        d.Yadd_mean,
-        d.Yadd_std,
     )
 end
