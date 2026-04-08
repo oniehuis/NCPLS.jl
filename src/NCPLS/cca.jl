@@ -55,7 +55,6 @@ function loading_weights(
     W₀::AbstractArray{<:Real},
     c::AbstractVector{<:Real},
 )
-
     q = size(W₀, ndims(W₀))
     q == length(c) || throw(DimensionMismatch(
         "Length of c must match the last dimension of W₀"))
@@ -63,12 +62,7 @@ function loading_weights(
     predictor_dims = size(W₀)[1:end-1]
     W₀ₘ = reshape(W₀, :, q)
     Wₘ = W₀ₘ * c
-    W = reshape(Wₘ, predictor_dims...)
-
-    nw = norm(W)
-    nw > 0 || throw(ArgumentError("Loading weights have zero norm"))
-
-    W ./ nw
+    reshape(Wₘ, predictor_dims...)
 end
 
 function score_vector(
@@ -81,7 +75,7 @@ function score_vector(
     reshape(X, size(X, 1), :) * vec(Wᵒ)
 end
 
-function normalize_score_vector(
+function normalize_vector(
     t::AbstractVector{Float64},
 )
     t_norm = norm(t)

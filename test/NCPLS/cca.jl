@@ -277,7 +277,7 @@ end
     )
 end
 
-@testset "loading_weights contracts response dimension and normalizes for matrix W0" begin
+@testset "loading_weights contracts response dimension for matrix W0" begin
     W0 = Float64[
         1 2
         3 4
@@ -286,15 +286,13 @@ end
     c = [2.0, -1.0]
 
     w = NCPLS.loading_weights(W0, c)
-    expected_raw = W0 * c
-    expected = expected_raw / sqrt(sum(expected_raw .^ 2))
+    expected = W0 * c
 
     @test size(w) == (3,)
     @test w ≈ expected
-    @test sum(w .^ 2) ≈ 1.0 atol = 1e-12
 end
 
-@testset "loading_weights contracts response dimension and normalizes for tensor W0" begin
+@testset "loading_weights contracts response dimension for tensor W0" begin
     W0 = Array{Float64}(undef, 2, 2, 3)
     W0[:, :, 1] = [1.0 2.0; 3.0 4.0]
     W0[:, :, 2] = [0.0 1.0; 1.0 0.0]
@@ -302,16 +300,13 @@ end
     c = [1.0, -2.0, 0.5]
 
     w = NCPLS.loading_weights(W0, c)
-    expected_raw = reshape(W0, :, length(c)) * c
-    expected_raw = reshape(expected_raw, 2, 2)
-    expected = expected_raw / sqrt(sum(expected_raw .^ 2))
+    expected = reshape(reshape(W0, :, length(c)) * c, 2, 2)
 
     @test size(w) == (2, 2)
     @test w ≈ expected
-    @test sum(w .^ 2) ≈ 1.0 atol = 1e-12
 end
 
-@testset "loading_weights validates c length and zero norm" begin
+@testset "loading_weights validates c length and allows zero output norm" begin
     W0 = Float64[
         1 2
         3 4
@@ -330,14 +325,8 @@ end
         1 2
         2 4
     ]
-    err_zero = try
-        NCPLS.loading_weights(W0_zero, [2.0, -1.0])
-        nothing
-    catch err
-        err
-    end
-    @test err_zero isa ArgumentError
-    @test occursin("Loading weights have zero norm", sprint(showerror, err_zero))
+    w_zero = NCPLS.loading_weights(W0_zero, [2.0, -1.0])
+    @test w_zero == zeros(2)
 end
 
 @testset "score_vector forms score vectors for matrix and tensor inputs" begin
@@ -377,17 +366,17 @@ end
     )
 end
 
-@testset "normalize_score_vector scales scores to unit norm" begin
+@testset "normalize_vector scales vectors to unit norm" begin
     t = [3.0, 4.0]
-    t_normed = NCPLS.normalize_score_vector(t)
+    t_normed = NCPLS.normalize_vector(t)
 
     @test t_normed ≈ [0.6, 0.8]
     @test sum(t_normed .^ 2) ≈ 1.0 atol = 1e-12
 end
 
-@testset "normalize_score_vector rejects zero scores" begin
+@testset "normalize_vector rejects zero vectors" begin
     err = try
-        NCPLS.normalize_score_vector(zeros(3))
+        NCPLS.normalize_vector(zeros(3))
         nothing
     catch err
         err

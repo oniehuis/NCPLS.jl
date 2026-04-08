@@ -42,7 +42,7 @@ function fit_ncpls_core(
         Ycomb = isnothing(Yadd) ? Y : hcat(Y, d.Yadd)
         W₀ = candidate_loading_weights(d.X, Ycomb, obs_weights)
         selectdim(W0, ndims(W0), i) .= W₀
-        
+
         #Z₀ = X ⓓ W₀
         Z₀ = candidate_scores(d.X, W₀)
         # Z₀ := Z₀ - T_A T_Aᵗ Z₀ only when Yadditional is used
@@ -57,7 +57,7 @@ function fit_ncpls_core(
         # W = W₀ ⓐ₁ C
         W = loading_weights(W₀, c[:, i])
 
-        if m.multilinear
+        if m.multilinear  # multilinear branch
             throw(ArgumentError("Multilinear loading weights option is not yet implemented."))
         else # unfolded branch
             # Wᵒ := W
@@ -71,7 +71,7 @@ function fit_ncpls_core(
         # t = X ⓓ Wᵒ
         t  = orthogonalize_on_accumulated_scores(t,  T[:, 1:i-1])
         # t := t / ||t||
-        t = normalize_score_vector(t)
+        t = normalize_vector(t)
         T[:, i] = t
 
         # P = Xᵗ_d ⓐ₁ t
