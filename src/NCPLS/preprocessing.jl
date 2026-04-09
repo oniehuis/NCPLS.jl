@@ -31,7 +31,7 @@ function preprocess(
 
     X, X_mean, X_std = centerscale(float64(X), m.center_X, m.scale_X, obs_weights)
 
-    Yprim, Yprim_mean, Yprim_std = 
+    Yprim, Yprim_mean, _ = 
         centerscale(float64(Yprim), m.center_Yprim, false, obs_weights)
 
     if !isnothing(Yadd)
@@ -49,7 +49,6 @@ function preprocess(
         # Preprocessed primary responses
         Yprim=Yprim,
         Yprim_mean=Yprim_mean,
-        Yprim_std=Yprim_std, 
 
         # Preprocessed additional responses
         Yadd=Yadd,

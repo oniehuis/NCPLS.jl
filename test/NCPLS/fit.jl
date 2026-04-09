@@ -49,7 +49,6 @@ import Logging
     @test mf.X_mean ≈ d.X_mean
     @test mf.X_std ≈ d.X_std
     @test mf.Yprim_mean ≈ d.Yprim_mean
-    @test mf.Yprim_std ≈ d.Yprim_std
 end
 
 @testset "fit_ncpls_core returns fitted arrays for tensors" begin
@@ -95,7 +94,6 @@ end
     @test mf.X_mean ≈ d.X_mean
     @test mf.X_std ≈ d.X_std
     @test mf.Yprim_mean ≈ d.Yprim_mean
-    @test mf.Yprim_std ≈ d.Yprim_std
 end
 
 @testset "fit wrapper delegates to fit_ncpls_core" begin
@@ -139,7 +137,6 @@ end
     @test via_wrapper.X_mean ≈ via_core.X_mean
     @test via_wrapper.X_std ≈ via_core.X_std
     @test via_wrapper.Yprim_mean ≈ via_core.Yprim_mean
-    @test via_wrapper.Yprim_std ≈ via_core.Yprim_std
 end
 
 @testset "fit paths handle optional Yadd and surface preprocessing validation errors" begin

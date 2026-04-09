@@ -113,7 +113,6 @@ end
     @test size(d_matrix.X_mean) == (2,)
     @test size(d_matrix.X_std) == (2,)
     @test size(d_matrix.Yprim_mean) == (2,)
-    @test size(d_matrix.Yprim_std) == (2,)
     @test Ycomb_matrix == hcat(d_matrix.Yprim, d_matrix.Yadd)
     @test d_matrix.Yadd == Float64.(Yadd)
 
@@ -128,7 +127,6 @@ end
     @test size(d_tensor.X_mean) == (3, 2)
     @test size(d_tensor.X_std) == (3, 2)
     @test size(d_tensor.Yprim_mean) == (2,)
-    @test size(d_tensor.Yprim_std) == (2,)
     @test size(Ycomb_tensor) == (4, 3)
     @test Ycomb_tensor == hcat(d_tensor.Yprim, d_tensor.Yadd)
     @test sum(d_tensor.X, dims = 1) ≈ zeros(1, 3, 2) atol=1e-12

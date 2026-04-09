@@ -27,6 +27,5 @@ export xmean
 export xscores
 export xstd
 export ymean
-export ystd
 
 end # module NCPLS

@@ -145,13 +145,6 @@ Return the primary-response mean vector for the fitted model.
 ymean(mf::AbstractNCPLSFit) = mf.Yprim_mean
 
 """
-    ystd(mf::AbstractNCPLSFit)
-
-Return the primary-response standard deviation vector for the fitted model.
-"""
-ystd(mf::AbstractNCPLSFit) = mf.Yprim_std
-
-"""
     NCPLSFit
 
 Fitted NCPLS model returned by `fit`. An `NCPLSFit` stores the regression and projection
@@ -202,7 +195,6 @@ struct NCPLSFit{
     X_mean::TXStat
     X_std::TXStat
     Yprim_mean::TYStat
-    Yprim_std::TYStat
 end
 
 function Base.show(io::IO, mf::NCPLSFit)
@@ -303,19 +295,19 @@ end
 """
     restore_response_scale(Y::AbstractArray{<:Real}, mf::NCPLSFit; add_mean::Bool)
 
-Rescale response values from the fitted model's normalized response space back to the
-original response scale, optionally adding the stored response mean.
+Restore response values from the fitted model's centered response space, optionally
+adding the stored response mean.
 """
 function restore_response_scale(
     Y::AbstractArray{<:Real},
     mf::NCPLSFit;
     add_mean::Bool
 )
-    M = length(mf.Yprim_std)
-    lead_dims = ntuple(_ -> 1, ndims(Y) - 1)
-    Ystd = reshape(mf.Yprim_std, lead_dims..., M)
-    Ymean = reshape(mf.Yprim_mean, lead_dims..., M)
+    Y_restored = float64(Y)
+    add_mean || return Y_restored
 
-    Y_restored = float64(Y) .* Ystd
-    add_mean ? Y_restored .+ Ymean : Y_restored
+    M = length(mf.Yprim_mean)
+    lead_dims = ntuple(_ -> 1, ndims(Y) - 1)
+    Ymean = reshape(mf.Yprim_mean, lead_dims..., M)
+    Y_restored .+ Ymean
 end

@@ -22,7 +22,6 @@ function mock_matrix_fit()
         [1.0, 2.0],
         [2.0, 4.0],
         [10.0],
-        [5.0],
     )
 end
 
@@ -48,7 +47,6 @@ function mock_tensor_fit()
         [1.0 2.0; 3.0 4.0],
         [2.0 4.0; 5.0 10.0],
         [2.0, 5.0],
-        [1.0, 4.0],
     )
 end
 
@@ -104,7 +102,7 @@ end
 
     Xnorm = (NCPLS.float64(X) .- reshape(mf.X_mean, 1, :)) ./ reshape(mf.X_std, 1, :)
     expected1 = Xnorm * NCPLS.coef(mf, 1)
-    expected1 = expected1 .* reshape(mf.Yprim_std, 1, :) .+ reshape(mf.Yprim_mean, 1, :)
+    expected1 = expected1 .+ reshape(mf.Yprim_mean, 1, :)
     @test dropdims(Ypred1; dims = 2) ≈ expected1
 
     Tproj = NCPLS.project(mf, X)
@@ -143,7 +141,7 @@ end
     coef1 = NCPLS.coef(mf, 1)
     expected1 = reshape(reshape(Xnorm, size(X, 1), :) * reshape(coef1, :, size(Y, 2)),
         size(X, 1), size(Y, 2))
-    expected1 = expected1 .* reshape(mf.Yprim_std, 1, :) .+ reshape(mf.Yprim_mean, 1, :)
+    expected1 = expected1 .+ reshape(mf.Yprim_mean, 1, :)
 
     @test dropdims(NCPLS.predict(mf, X, 1); dims = 2) ≈ expected1
     @test_throws DimensionMismatch NCPLS.predict(mf, rand(4, 3, 3))

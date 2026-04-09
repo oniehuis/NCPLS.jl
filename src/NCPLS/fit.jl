@@ -185,6 +185,5 @@ function fit_ncpls_core(
         d.X_mean,
         d.X_std,
         d.Yprim_mean,
-        d.Yprim_std,
     )
 end

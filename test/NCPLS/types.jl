@@ -21,7 +21,6 @@ function mock_matrix_fit()
         [1.0, 2.0],
         [2.0, 4.0],
         [10.0],
-        [5.0],
     )
 end
 
@@ -48,7 +47,6 @@ function mock_tensor_fit()
         [1.0 2.0; 3.0 4.0],
         [0.5 1.5; 2.5 3.5],
         [2.0, 5.0],
-        [1.0, 4.0],
     )
 end
 
@@ -181,9 +179,9 @@ end
 
     Y = [1.0 2.0; 3.0 4.0]
     @test NCPLS.restore_response_scale(Y, mf; add_mean = true) ≈
-        Y .* reshape(mf.Yprim_std, 1, :) .+ reshape(mf.Yprim_mean, 1, :)
+        Y .+ reshape(mf.Yprim_mean, 1, :)
     @test NCPLS.restore_response_scale(Y, mf; add_mean = false) ≈
-        Y .* reshape(mf.Yprim_std, 1, :)
+        Y
 end
 
 @testset "NCPLSFit getters" begin
@@ -192,7 +190,6 @@ end
     @test NCPLS.xmean(mf) === mf.X_mean
     @test NCPLS.xstd(mf) === mf.X_std
     @test NCPLS.ymean(mf) === mf.Yprim_mean
-    @test NCPLS.ystd(mf) === mf.Yprim_std
 
     @test NCPLS.xscores(mf) === mf.T
     @test NCPLS.xscores(mf, 1) == mf.T[:, 1]
