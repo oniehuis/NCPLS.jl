@@ -20,6 +20,8 @@ using Markdown
 using NCPLS
 using StatsAPI
 
+const REPO = Documenter.Remotes.GitHub("oniehuis", "NCPLS.jl")
+
 DocMeta.setdocmeta!(
     NCPLS,
     :DocTestSetup,
@@ -29,8 +31,12 @@ DocMeta.setdocmeta!(
 
 makedocs(
     sitename = "NCPLS",
-    format = Documenter.HTML(mathengine = Documenter.KaTeX()),
+    format = Documenter.HTML(
+        mathengine = Documenter.KaTeX(),
+        edit_link = "main",
+    ),
     modules = [NCPLS],
+    repo = REPO,
     checkdocs = :none,
     authors = "Oliver Niehuis",
     pages = [
@@ -46,7 +52,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/oniehuis/NCPLS.jl", 
+    repo = "github.com/oniehuis/NCPLS.jl",
     devbranch = "main", 
     push_preview = false,
     versions = [
