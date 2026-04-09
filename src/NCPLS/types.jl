@@ -287,6 +287,11 @@ function residuals(mf::NCPLSFit, ncomps::Integer)
     restore_response_scale(Yres, mf; add_mean=false)
 end
 
+"""
+    ncomponents(mf::AbstractNCPLSFit)
+
+Return the number of latent components stored in the fitted NCPLS model.
+"""
 ncomponents(mf::AbstractNCPLSFit) = size(mf.B, ndims(mf.B) - 1)
 
 function validate_ncomponents(mf::AbstractNCPLSFit, ncomps::Integer)
@@ -295,6 +300,12 @@ function validate_ncomponents(mf::AbstractNCPLSFit, ncomps::Integer)
     ncomps
 end
 
+"""
+    restore_response_scale(Y::AbstractArray{<:Real}, mf::NCPLSFit; add_mean::Bool)
+
+Rescale response values from the fitted model's normalized response space back to the
+original response scale, optionally adding the stored response mean.
+"""
 function restore_response_scale(
     Y::AbstractArray{<:Real},
     mf::NCPLSFit;

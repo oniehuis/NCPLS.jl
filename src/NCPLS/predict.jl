@@ -65,6 +65,12 @@ function project(
     Xmat * Rmat
 end
 
+"""
+    normalize_predictors(X::AbstractArray{<:Real}, mf::AbstractNCPLSFit)
+
+Center and scale predictor data using the preprocessing statistics stored in the fitted
+NCPLS model.
+"""
 function normalize_predictors(
     X::AbstractArray{<:Real},
     mf::AbstractNCPLSFit
