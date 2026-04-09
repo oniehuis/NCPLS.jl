@@ -24,7 +24,7 @@ end
         center_X::Bool=true,
         scale_X::Bool=false,
         center_Yprim::Bool=true,
-        multilinear::Bool=false,
+        multilinear::Bool=true,
         orthogonalize_mode_weights::Bool=false,
         multilinear_maxiter::Int=500,
         multilinear_tol::Float64=1e-10,
@@ -32,8 +32,9 @@ end
         multilinear_seed::Int=1
     )
 
-Construct an `NCPLSModel` with the given fitting options. The multilinear control fields
-govern initialization, iteration limits, and convergence in the PARAFAC step.
+Construct an `NCPLSModel` with the given fitting options. By default, the multilinear
+loading-weight branch is enabled. The multilinear control fields govern
+initialization, iteration limits, and convergence in the PARAFAC step.
 
 `multilinear_init` selects the starting values for rank-1 PARAFAC fits. The supported
 options are `:hosvd`, which initializes each mode with the leading left singular vector
@@ -45,7 +46,7 @@ function NCPLSModel(;
     center_X::Bool=true,
     scale_X::Bool=false,
     center_Yprim::Bool=true,
-    multilinear::Bool=false,
+    multilinear::Bool=true,
     orthogonalize_mode_weights::Bool=false,
     multilinear_maxiter::Int=500,
     multilinear_tol::Float64=1e-10,

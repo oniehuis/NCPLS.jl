@@ -270,7 +270,7 @@ end
 
     @test result.ncplsfit isa NCPLS.NCPLSFit
     @test result.ncpls_model.ncomponents == 2
-    @test result.ncpls_model.multilinear === false
+    @test result.ncpls_model.multilinear === true
     @test sort(vcat(result.train_idx, result.test_idx)) == collect(1:size(data.X, 1))
     @test isempty(intersect(result.train_idx, result.test_idx))
 
@@ -348,6 +348,7 @@ end
     @test result.test_idx == result.cppls.test_idx
     @test result.test_idx == result.ncpls.test_idx
     @test result.ncpls.ncpls_model.center_Yprim === false
+    @test result.ncpls.ncpls_model.multilinear === true
     @test length(result.prediction_rmse_train) == 2
     @test length(result.prediction_rmse_test) == 2
     @test length(result.prediction_cor_train) == 2

@@ -1,5 +1,5 @@
 function mock_matrix_fit()
-    model = NCPLS.NCPLSModel(ncomponents = 2)
+    model = NCPLS.NCPLSModel(ncomponents = 2, multilinear = false)
     NCPLS.NCPLSFit(
         model,
         reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
@@ -25,7 +25,7 @@ function mock_matrix_fit()
 end
 
 function mock_tensor_fit()
-    model = NCPLS.NCPLSModel(ncomponents = 2)
+    model = NCPLS.NCPLSModel(ncomponents = 2, multilinear = false)
     NCPLS.NCPLSFit(
         model,
         reshape(collect(1.0:16.0), 2, 2, 2, 2),
@@ -56,7 +56,7 @@ end
     @test model.center_X === true
     @test model.scale_X === false
     @test model.center_Yprim === true
-    @test model.multilinear === false
+    @test model.multilinear === true
     @test model.orthogonalize_mode_weights === false
     @test model.multilinear_maxiter == 500
     @test model.multilinear_tol == 1e-10

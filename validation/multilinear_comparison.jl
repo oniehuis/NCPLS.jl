@@ -3,7 +3,7 @@
         data;
         model::Union{NCPLSModel, Nothing}=nothing,
         ncomponents::Integer=1,
-        multilinear::Bool=false,
+        multilinear::Bool=true,
         center_X::Bool=true,
         scale_X::Bool=false,
         center_Yprim::Bool=true,
@@ -21,7 +21,7 @@ function analyze_synthetic_multilinear_with_ncpls(
     data;
     model::Union{NCPLSModel, Nothing}=nothing,
     ncomponents::Integer=1,
-    multilinear::Bool=false,
+    multilinear::Bool=true,
     center_X::Bool=true,
     scale_X::Bool=false,
     center_Yprim::Bool=true,

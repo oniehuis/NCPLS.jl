@@ -2,8 +2,9 @@
 
 NCPLS.jl provides a Julia implementation of NCPLS for matrix- and tensor-valued
 predictors. The package supports weighted preprocessing, latent-component regression,
-projection of new observations, and an optional multilinear loading-weight branch based
-on rank-1 PARAFAC updates.
+projection of new observations, and a multilinear loading-weight branch based on rank-1
+PARAFAC updates that is enabled by default. The unfolded alternative remains available
+by setting `multilinear=false`.
 
 ## Installation
 

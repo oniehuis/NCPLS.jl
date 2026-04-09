@@ -3,7 +3,7 @@
         data;
         model::Union{NCPLSModel, Nothing}=nothing,
         ncomponents::Integer=2,
-        multilinear::Bool=false,
+        multilinear::Bool=true,
         orthogonalize_mode_weights::Bool=false,
         center_X::Bool=true,
         scale_X::Bool=false,
@@ -29,7 +29,7 @@ function analyze_synthetic_gcms_with_ncpls(
     data;
     model::Union{NCPLSModel, Nothing}=nothing,
     ncomponents::Integer=2,
-    multilinear::Bool=false,
+    multilinear::Bool=true,
     orthogonalize_mode_weights::Bool=false,
     center_X::Bool=true,
     scale_X::Bool=false,

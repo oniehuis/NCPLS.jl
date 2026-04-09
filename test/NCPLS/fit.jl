@@ -7,6 +7,7 @@ import Logging
         center_X = true,
         scale_X = true,
         center_Yprim = true,
+        multilinear = false,
     )
     X = Float64[
         1 2
@@ -57,6 +58,7 @@ end
         center_X = true,
         scale_X = true,
         center_Yprim = true,
+        multilinear = false,
     )
     X = reshape(collect(1.0:24.0), 4, 3, 2)
     Y = Float64[
@@ -102,6 +104,7 @@ end
         center_X = true,
         scale_X = false,
         center_Yprim = true,
+        multilinear = false,
     )
     X = Float64[
         2 1 0
@@ -140,7 +143,7 @@ end
 end
 
 @testset "fit paths handle optional Yadd and surface preprocessing validation errors" begin
-    model = NCPLS.NCPLSModel()
+    model = NCPLS.NCPLSModel(multilinear = false)
     X_matrix = rand(4, 2)
     X_tensor = rand(4, 2, 2)
     Y = rand(4, 2)

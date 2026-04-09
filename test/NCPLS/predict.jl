@@ -2,7 +2,7 @@ import Random
 
 function mock_matrix_fit()
     NCPLS.NCPLSFit(
-        NCPLS.NCPLSModel(),
+        NCPLS.NCPLSModel(multilinear = false),
         reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
         [1.0 2.0; 3.0 4.0],
         [1.0 0.0; 0.0 1.0; 1.0 1.0],
@@ -27,7 +27,7 @@ end
 
 function mock_tensor_fit()
     NCPLS.NCPLSFit(
-        NCPLS.NCPLSModel(),
+        NCPLS.NCPLSModel(multilinear = false),
         reshape(collect(1.0:16.0), 2, 2, 2, 2),
         reshape(collect(1.0:8.0), 2, 2, 2),
         [1.0 0.0; 0.0 1.0; 1.0 1.0; 0.5 0.5],
