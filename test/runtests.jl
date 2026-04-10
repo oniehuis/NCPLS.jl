@@ -13,8 +13,16 @@ end
     include(joinpath("NCPLS", "fit.jl"))
 end
 
+@testset "NCPLS/landscape.jl" begin
+    include(joinpath("NCPLS", "landscape.jl"))
+end
+
 @testset "NCPLS/predict.jl" begin
     include(joinpath("NCPLS", "predict.jl"))
+end
+
+@testset "NCPLS/scoreplot.jl" begin
+    include(joinpath("NCPLS", "scoreplot.jl"))
 end
 
 @testset "NCPLS/preprocessing.jl" begin

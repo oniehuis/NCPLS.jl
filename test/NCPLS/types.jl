@@ -50,6 +50,36 @@ function mock_tensor_fit()
     )
 end
 
+function mock_matrix_fit_with_metadata()
+    axis = NCPLS.PredictorAxis("RT", [1.0, 2.0]; unit = "min")
+    NCPLS.NCPLSFit(
+        NCPLS.NCPLSModel(ncomponents = 2, multilinear = false),
+        reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
+        [1.0 2.0; 3.0 4.0],
+        [1.0 0.0; 0.0 1.0; 1.0 1.0],
+        [2.0 1.0; 0.0 1.0],
+        reshape([5.0, 6.0], 1, 2),
+        [1.0 0.0; 0.0 1.0],
+        nothing,
+        reshape([1.0, 2.0], 1, 2),
+        reshape(collect(1.0:4.0), 2, 1, 2),
+        [0.5, 0.7],
+        reshape([1.0, 2.0, 3.0], :, 1),
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        nothing,
+        [1.0, 2.0],
+        [2.0, 4.0],
+        [10.0];
+        samplelabels = ["s1", "s2", "s3"],
+        responselabels = ["species_A"],
+        sampleclasses = ["A", "B", "A"],
+        predictoraxes = [axis],
+    )
+end
+
 @testset "NCPLSModel constructor and fields" begin
     model = NCPLS.NCPLSModel()
     @test model.ncomponents == 2
@@ -137,6 +167,10 @@ end
     @test matrix_mf.W_multilinear_lambda === nothing
     @test matrix_mf.W_multilinear_niter === nothing
     @test matrix_mf.W_multilinear_converged === nothing
+    @test matrix_mf.samplelabels == ["1", "2", "3"]
+    @test matrix_mf.responselabels == String[]
+    @test matrix_mf.sampleclasses === nothing
+    @test matrix_mf.predictoraxes == NCPLS.PredictorAxis[]
 
     tensor_mf = mock_tensor_fit()
     @test tensor_mf isa NCPLS.NCPLSFit
@@ -150,6 +184,15 @@ end
     @test size(tensor_mf.W0) == (2, 2, 2, 2)
     @test size(tensor_mf.X_mean) == (2, 2)
     @test size(tensor_mf.X_std) == (2, 2)
+
+    metadata_mf = mock_matrix_fit_with_metadata()
+    @test metadata_mf.samplelabels == ["s1", "s2", "s3"]
+    @test metadata_mf.responselabels == ["species_A"]
+    @test metadata_mf.sampleclasses == ["A", "B", "A"]
+    @test length(metadata_mf.predictoraxes) == 1
+    @test metadata_mf.predictoraxes[1].name == "RT"
+    @test metadata_mf.predictoraxes[1].values == [1.0, 2.0]
+    @test metadata_mf.predictoraxes[1].unit == "min"
 end
 
 @testset "NCPLSFit show methods" begin
@@ -185,11 +228,15 @@ end
 end
 
 @testset "NCPLSFit getters" begin
-    mf = mock_matrix_fit()
+    mf = mock_matrix_fit_with_metadata()
 
     @test NCPLS.xmean(mf) === mf.X_mean
     @test NCPLS.xstd(mf) === mf.X_std
     @test NCPLS.ymean(mf) === mf.Yprim_mean
+    @test NCPLS.samplelabels(mf) === mf.samplelabels
+    @test NCPLS.responselabels(mf) === mf.responselabels
+    @test NCPLS.sampleclasses(mf) === mf.sampleclasses
+    @test NCPLS.predictoraxes(mf) === mf.predictoraxes
 
     @test NCPLS.xscores(mf) === mf.T
     @test NCPLS.xscores(mf, 1) == mf.T[:, 1]

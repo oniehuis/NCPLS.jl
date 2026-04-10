@@ -50,6 +50,10 @@ import Logging
     @test mf.X_mean ≈ d.X_mean
     @test mf.X_std ≈ d.X_std
     @test mf.Yprim_mean ≈ d.Yprim_mean
+    @test NCPLS.samplelabels(mf) == ["1", "2", "3", "4"]
+    @test NCPLS.responselabels(mf) == String[]
+    @test NCPLS.sampleclasses(mf) === nothing
+    @test NCPLS.predictoraxes(mf) == NCPLS.PredictorAxis[]
 end
 
 @testset "fit_ncpls_core returns fitted arrays for tensors" begin
@@ -96,6 +100,10 @@ end
     @test mf.X_mean ≈ d.X_mean
     @test mf.X_std ≈ d.X_std
     @test mf.Yprim_mean ≈ d.Yprim_mean
+    @test NCPLS.samplelabels(mf) == ["1", "2", "3", "4"]
+    @test NCPLS.responselabels(mf) == String[]
+    @test NCPLS.sampleclasses(mf) === nothing
+    @test NCPLS.predictoraxes(mf) == NCPLS.PredictorAxis[]
 end
 
 @testset "fit wrapper delegates to fit_ncpls_core" begin
@@ -140,6 +148,10 @@ end
     @test via_wrapper.X_mean ≈ via_core.X_mean
     @test via_wrapper.X_std ≈ via_core.X_std
     @test via_wrapper.Yprim_mean ≈ via_core.Yprim_mean
+    @test via_wrapper.samplelabels == via_core.samplelabels
+    @test via_wrapper.responselabels == via_core.responselabels
+    @test via_wrapper.sampleclasses === via_core.sampleclasses
+    @test via_wrapper.predictoraxes == via_core.predictoraxes
 end
 
 @testset "fit paths handle optional Yadd and surface preprocessing validation errors" begin
@@ -201,6 +213,77 @@ end
     end
     @test err_yprim_yadd isa DimensionMismatch
     @test occursin("Yprim and Yadd must have the same number of rows", sprint(showerror, err_yprim_yadd))
+end
+
+@testset "fit stores and validates metadata" begin
+    model = NCPLS.NCPLSModel(ncomponents = 1, multilinear = false)
+    X = reshape(collect(1.0:24.0), 4, 3, 2)
+    Y = Float64[
+        1 0
+        0 1
+        1 0
+        0 1
+    ]
+
+    axes = (
+        (name = "RT", values = [5.0, 5.5, 6.0], unit = "min"),
+        NCPLS.PredictorAxis("m/z", [91, 105]; unit = "Da"),
+    )
+
+    mf = NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        samplelabels = [:s1, :s2, :s3, :s4],
+        responselabels = [:species_A, :species_B],
+        sampleclasses = [:A, :B, :A, :B],
+        predictoraxes = axes,
+    )
+
+    @test NCPLS.samplelabels(mf) == ["s1", "s2", "s3", "s4"]
+    @test NCPLS.responselabels(mf) == ["species_A", "species_B"]
+    @test NCPLS.sampleclasses(mf) == [:A, :B, :A, :B]
+    @test length(NCPLS.predictoraxes(mf)) == 2
+    @test NCPLS.predictoraxes(mf)[1].name == "RT"
+    @test NCPLS.predictoraxes(mf)[1].values == [5.0, 5.5, 6.0]
+    @test NCPLS.predictoraxes(mf)[1].unit == "min"
+    @test NCPLS.predictoraxes(mf)[2].name == "m/z"
+    @test NCPLS.predictoraxes(mf)[2].values == [91, 105]
+    @test NCPLS.predictoraxes(mf)[2].unit == "Da"
+
+    @test_throws ArgumentError NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        samplelabels = ["s1", "s2", "s3"],
+    )
+    @test_throws ArgumentError NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        responselabels = ["species_A"],
+    )
+    @test_throws ArgumentError NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        sampleclasses = [:A, :B, :A],
+    )
+    @test_throws ArgumentError NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        predictoraxes = [(name = "RT", values = [1.0, 2.0, 3.0])],
+    )
+    @test_throws ArgumentError NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        predictoraxes = (
+            (name = "RT", values = [1.0, 2.0], unit = "min"),
+            (name = "m/z", values = [91, 105], unit = "Da"),
+        ),
+    )
 end
 
 @testset "fit stores multilinear mode weights and diagnostics" begin

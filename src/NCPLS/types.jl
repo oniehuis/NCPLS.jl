@@ -106,6 +106,47 @@ function Base.show(io::IO, ::MIME"text/plain", m::NCPLSModel)
 end
 
 """
+    PredictorAxis(name, values; unit=nothing)
+    PredictorAxis(; name, values, unit=nothing)
+
+Store metadata for one non-sample predictor axis of a multiway NCPLS fit. `name`
+identifies the axis (for example `"RT"` or `"m/z"`), `values` stores the axis positions,
+and `unit` optionally stores the physical unit separately from the numeric values.
+"""
+struct PredictorAxis{TValues<:AbstractVector}
+    name::String
+    values::TValues
+    unit::Union{String, Nothing}
+end
+
+function PredictorAxis(
+    name::AbstractString,
+    values::AbstractVector;
+    unit::Union{AbstractString, Nothing}=nothing,
+)
+    isempty(name) && throw(ArgumentError("PredictorAxis name must be non-empty"))
+    PredictorAxis(
+        String(name),
+        collect(values),
+        isnothing(unit) || isempty(unit) ? nothing : String(unit),
+    )
+end
+
+PredictorAxis(;
+    name::AbstractString,
+    values::AbstractVector,
+    unit::Union{AbstractString, Nothing}=nothing,
+) = PredictorAxis(name, values; unit=unit)
+
+function Base.show(io::IO, axis::PredictorAxis)
+    print(io, "PredictorAxis(",
+        "name=", repr(axis.name),
+        ", length=", length(axis.values),
+        ", unit=", isnothing(axis.unit) ? "nothing" : repr(axis.unit),
+        ")")
+end
+
+"""
     AbstractNCPLSFit
 
 Abstract supertype for fitted NCPLS models.
@@ -174,6 +215,10 @@ struct NCPLSFit{
     TWMLConverged,
     TXStat,
     TYStat,
+    TSampleLabels,
+    TResponseLabels,
+    TSampleClasses,
+    TPredictorAxes,
 } <: AbstractNCPLSFit
 
     model::TModel
@@ -196,6 +241,80 @@ struct NCPLSFit{
     X_mean::TXStat
     X_std::TXStat
     Yprim_mean::TYStat
+    samplelabels::TSampleLabels
+    responselabels::TResponseLabels
+    sampleclasses::TSampleClasses
+    predictoraxes::TPredictorAxes
+end
+
+function NCPLSFit(
+    model,
+    B,
+    R,
+    T,
+    P,
+    Q,
+    W,
+    W_modes,
+    c,
+    W0,
+    rho,
+    Yres,
+    W_multilinear_relerr,
+    W_multilinear_method,
+    W_multilinear_lambda,
+    W_multilinear_niter,
+    W_multilinear_converged,
+    X_mean,
+    X_std,
+    Yprim_mean;
+    samplelabels::AbstractVector=String[],
+    responselabels::AbstractVector=String[],
+    sampleclasses::Union{AbstractVector, Nothing}=nothing,
+    predictoraxes=(),
+)
+    nsamples = size(T, 1)
+    nresponses = size(Q, 1)
+    predictor_dims = size(B)[1:end-2]
+
+    samplelabels = default_sample_labels(
+        validate_label_length(samplelabels, nsamples, "samplelabels"),
+        nsamples,
+    )
+    responselabels = normalize_string_labels(
+        responselabels,
+        nresponses,
+        "responselabels",
+    )
+    sampleclasses = normalize_sampleclasses(sampleclasses, nsamples)
+    predictoraxes = normalize_predictoraxes_metadata(predictoraxes, predictor_dims)
+
+    NCPLSFit(
+        model,
+        B,
+        R,
+        T,
+        P,
+        Q,
+        W,
+        W_modes,
+        c,
+        W0,
+        rho,
+        Yres,
+        W_multilinear_relerr,
+        W_multilinear_method,
+        W_multilinear_lambda,
+        W_multilinear_niter,
+        W_multilinear_converged,
+        X_mean,
+        X_std,
+        Yprim_mean,
+        samplelabels,
+        responselabels,
+        sampleclasses,
+        predictoraxes,
+    )
 end
 
 function Base.show(io::IO, mf::NCPLSFit)
@@ -216,6 +335,35 @@ function Base.show(io::IO, ::MIME"text/plain", mf::NCPLSFit)
     println(io, "  components: ", size(mf.B, ndims(mf.B) - 1))
     print(io, "  multilinear: ", mf.model.multilinear)
 end
+
+"""
+    predictoraxes(mf::NCPLSFit)
+
+Return the stored metadata for the non-sample predictor axes of the fitted model.
+"""
+predictoraxes(mf::NCPLSFit) = mf.predictoraxes
+
+"""
+    responselabels(mf::NCPLSFit)
+
+Return the stored response labels for the fitted model.
+"""
+responselabels(mf::NCPLSFit) = mf.responselabels
+
+"""
+    sampleclasses(mf::NCPLSFit)
+
+Return the stored per-sample class labels, or `nothing` when no classes were supplied at
+fit time.
+"""
+sampleclasses(mf::NCPLSFit) = mf.sampleclasses
+
+"""
+    samplelabels(mf::NCPLSFit)
+
+Return the stored sample labels for the fitted model.
+"""
+samplelabels(mf::NCPLSFit) = mf.samplelabels
 
 """
     xscores(mf::NCPLSFit)

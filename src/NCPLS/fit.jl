@@ -5,6 +5,10 @@
         Yprim::AbstractMatrix{<:Real};
         Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
         obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
+        samplelabels::AbstractVector=String[],
+        responselabels::AbstractVector=String[],
+        sampleclasses::Union{AbstractVector, Nothing}=nothing,
+        predictoraxes=(),
         verbose::Bool=false
     ) -> NCPLSFit
 
@@ -17,8 +21,10 @@ orthogonalized on previous components, and the PARAFAC control settings
 
 `Yadd` may be used to supply additional responses that influence the loading-weight
 calculation but are not predicted. `obs_weights` applies sample weights during
-preprocessing and the candidate-weight and CCA steps. If `verbose=true`, iteration
-progress from the PARAFAC step is printed when `m.multilinear` is enabled.
+preprocessing and the candidate-weight and CCA steps. Optional `samplelabels`,
+`responselabels`, `sampleclasses`, and `predictoraxes` metadata are stored on the fitted
+object for downstream plotting and interpretation. If `verbose=true`, iteration progress
+from the PARAFAC step is printed when `m.multilinear` is enabled.
 """
 function fit(
     m::NCPLSModel,
@@ -36,6 +42,10 @@ end
         Yprim::AbstractMatrix{<:Real};
         Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
         obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
+        samplelabels::AbstractVector=String[],
+        responselabels::AbstractVector=String[],
+        sampleclasses::Union{AbstractVector, Nothing}=nothing,
+        predictoraxes=(),
         verbose::Bool=false
     ) -> NCPLSFit
 
@@ -43,8 +53,9 @@ Fit an NCPLS model and return an `NCPLSFit`.
 
 This is the low-level fitting routine used by [`fit`](@ref). `Yadd` supplies
 additional responses for the loading-weight calculation, `obs_weights` gives
-optional observation weights, and `verbose` controls PARAFAC iteration logging
-in multilinear fits.
+optional observation weights, `samplelabels`, `responselabels`, `sampleclasses`, and
+`predictoraxes` are stored as fit metadata, and `verbose` controls PARAFAC iteration
+logging in multilinear fits.
 """
 function fit_ncpls_core(
     m::NCPLSModel,
@@ -52,14 +63,36 @@ function fit_ncpls_core(
     Yprim::AbstractMatrix{<:Real};
     Yadd::T1=nothing,
     obs_weights::T2=nothing,
+    samplelabels::T3=String[],
+    responselabels::T4=String[],
+    sampleclasses::T5=nothing,
+    predictoraxes=(),
     verbose::Bool=false
 ) where {
     T1<:Union{AbstractMatrix{<:Real}, Nothing},
-    T2<:Union{AbstractVector{<:Real}, Nothing}
+    T2<:Union{AbstractVector{<:Real}, Nothing},
+    T3<:AbstractVector,
+    T4<:AbstractVector,
+    T5<:Union{AbstractVector, Nothing},
 }
 
     # Preprocess data: center/scale, optionally with weights.
     d = preprocess(m, X, Yprim, Yadd, obs_weights)
+
+    samplelabels = default_sample_labels(
+        validate_label_length(samplelabels, size(d.X, 1), "samplelabels"),
+        size(d.X, 1),
+    )
+    responselabels = normalize_string_labels(
+        responselabels,
+        size(d.Yprim, 2),
+        "responselabels",
+    )
+    sampleclasses = normalize_sampleclasses(sampleclasses, size(d.X, 1))
+    predictoraxes = normalize_predictoraxes_metadata(
+        predictoraxes,
+        size(d.X)[2:end],
+    )
 
     # Preallocate arrays for scores, loadings, regression coefficients, and diagnostics.
     T = zeros(Float64, size(d.X, 1), m.ncomponents)
@@ -185,5 +218,77 @@ function fit_ncpls_core(
         d.X_mean,
         d.X_std,
         d.Yprim_mean,
+        samplelabels = samplelabels,
+        responselabels = responselabels,
+        sampleclasses = sampleclasses,
+        predictoraxes = predictoraxes,
+    )
+end
+
+function validate_label_length(
+    labels::AbstractVector,
+    expected::Integer,
+    name::AbstractString,
+)
+    isempty(labels) || length(labels) == expected || throw(ArgumentError(
+        "`$name` must have length $expected, got $(length(labels))"))
+    labels
+end
+
+function default_sample_labels(labels::AbstractVector, n_samples::Integer)
+    isempty(labels) ? string.(1:n_samples) : string.(labels)
+end
+
+function normalize_string_labels(
+    labels::AbstractVector,
+    expected::Integer,
+    name::AbstractString,
+)
+    validate_label_length(labels, expected, name)
+    isempty(labels) ? String[] : string.(labels)
+end
+
+function normalize_sampleclasses(
+    sampleclasses::Union{AbstractVector, Nothing},
+    n_samples::Integer,
+)
+    isnothing(sampleclasses) && return nothing
+    length(sampleclasses) == n_samples || throw(ArgumentError(
+        "`sampleclasses` must have length $n_samples, got $(length(sampleclasses))"))
+    collect(sampleclasses)
+end
+
+function normalize_predictoraxes_metadata(
+    predictoraxes,
+    predictor_dims::NTuple{N, Int},
+) where {N}
+    (isnothing(predictoraxes) || isempty(predictoraxes)) && return PredictorAxis[]
+
+    length(predictoraxes) == N || throw(ArgumentError(
+        "`predictoraxes` must contain $N axis descriptions, got $(length(predictoraxes))"))
+
+    axes = PredictorAxis[]
+    for (j, axis_meta) in enumerate(predictoraxes)
+        axis = normalize_predictoraxis(axis_meta)
+        length(axis.values) == predictor_dims[j] || throw(ArgumentError(
+            "`predictoraxes[$j].values` must have length $(predictor_dims[j]), " *
+            "got $(length(axis.values))"))
+        push!(axes, axis)
+    end
+
+    axes
+end
+
+normalize_predictoraxis(axis::PredictorAxis) = axis
+
+function normalize_predictoraxis(axis)
+    props = propertynames(axis)
+    (:name in props && :values in props) || throw(ArgumentError(
+        "Each predictor axis must provide `name` and `values` fields"))
+    unit = :unit in props ? getproperty(axis, :unit) : nothing
+    PredictorAxis(
+        string(getproperty(axis, :name)),
+        getproperty(axis, :values);
+        unit = isnothing(unit) ? nothing : string(unit),
     )
 end
