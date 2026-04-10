@@ -321,6 +321,10 @@ function landscapeplot end
 Base.@doc LANDSCAPEPLOT_DOC landscapeplot
 
 function landscapeplot_plotly end
+function landscapeplot_plotly(mf::NCPLSFit; kwargs...)
+    _require_landscape_extension(:PlotlyJSExtension, "PlotlyJS")
+    error("Unreachable")
+end
 
 const WEIGHTLANDSCAPEPLOT_DOC = """
     weightlandscapeplot(mf; backend=:plotly, kwargs...)
@@ -354,6 +358,10 @@ function weightlandscapeplot end
 Base.@doc WEIGHTLANDSCAPEPLOT_DOC weightlandscapeplot
 
 function weightlandscapeplot_plotly end
+function weightlandscapeplot_plotly(mf::NCPLSFit; kwargs...)
+    _require_landscape_extension(:PlotlyJSExtension, "PlotlyJS")
+    error("Unreachable")
+end
 
 const WEIGHTPROFILESPLOT_DOC = """
     weightprofilesplot(mf; backend=:plotly, kwargs...)
@@ -382,6 +390,10 @@ function weightprofilesplot end
 Base.@doc WEIGHTPROFILESPLOT_DOC weightprofilesplot
 
 function weightprofilesplot_plotly end
+function weightprofilesplot_plotly(mf::NCPLSFit; kwargs...)
+    _require_landscape_extension(:PlotlyJSExtension, "PlotlyJS")
+    error("Unreachable")
+end
 
 function _require_landscape_extension(extsym::Symbol, pkg::AbstractString)
     Base.get_extension(@__MODULE__, extsym) === nothing &&
