@@ -229,10 +229,12 @@ function default_landscape_title(
     response::Union{Nothing, Integer},
     response_contrast::Union{Nothing, Tuple{<:Integer, <:Integer}},
 )
-    lv_label = lv isa Integer ? "LV$(lv)" : "Final"
+    lv_label = lv isa Integer ? "LV$(lv)" : ""
     response_label = landscape_response_label(mf, response, response_contrast)
-    isempty(response_label) ? "NCPLS $lv_label Landscape" :
-        "NCPLS $lv_label Landscape ($response_label)"
+    parts = String["Coefficient Landscape"]
+    !isempty(lv_label) && push!(parts, lv_label)
+    !isempty(response_label) && push!(parts, "($response_label)")
+    join(parts, " ")
 end
 
 function landscape_response_label(
@@ -247,13 +249,13 @@ function landscape_response_label(
 
     if !isnothing(response_contrast)
         pos, neg = response_contrast
-        return string(getlabel(pos), " - ", getlabel(neg))
+        return string(getlabel(pos), " – ", getlabel(neg))
     elseif !isnothing(response)
         return getlabel(response)
     elseif nresponses == 1
         return isempty(labels) ? "" : getlabel(1)
     elseif nresponses == 2
-        return string(getlabel(2), " - ", getlabel(1))
+        return string(getlabel(2), " – ", getlabel(1))
     else
         return ""
     end
