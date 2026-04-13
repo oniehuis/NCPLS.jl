@@ -1,3 +1,5 @@
+import Statistics: mean
+
 function mock_landscape_fit(;
     predictoraxes=NCPLS.PredictorAxis[],
     responselabels=String[],
