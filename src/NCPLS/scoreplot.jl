@@ -20,6 +20,10 @@ General keywords
 function scoreplot end
 
 function scoreplot_plotly end
+function scoreplot_plotly(args...; kwargs...)
+    _require_scoreplot_extension(:PlotlyJSExtension, "PlotlyJS")
+    error("Unreachable")
+end
 
 function _require_scoreplot_extension(extsym::Symbol, pkg::AbstractString)
     Base.get_extension(@__MODULE__, extsym) === nothing &&
