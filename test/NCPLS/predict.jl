@@ -1,6 +1,6 @@
 import Random
 
-function mock_matrix_fit()
+function predict_mock_matrix_fit()
     NCPLS.NCPLSFit(
         NCPLS.NCPLSModel(multilinear = false),
         reshape([1.0, 2.0, 3.0, 4.0], 2, 2, 1),
@@ -25,7 +25,7 @@ function mock_matrix_fit()
     )
 end
 
-function mock_tensor_fit()
+function predict_mock_tensor_fit()
     NCPLS.NCPLSFit(
         NCPLS.NCPLSModel(multilinear = false),
         reshape(collect(1.0:16.0), 2, 2, 2, 2),
@@ -51,11 +51,11 @@ function mock_tensor_fit()
 end
 
 @testset "normalize_predictors helper" begin
-    matrix_mf = mock_matrix_fit()
+    matrix_mf = predict_mock_matrix_fit()
     Xmat = [3.0 10.0; 5.0 14.0]
     @test NCPLS.normalize_predictors(Xmat, matrix_mf) ≈ [1.0 2.0; 2.0 3.0]
 
-    tensor_mf = mock_tensor_fit()
+    tensor_mf = predict_mock_tensor_fit()
     Xtensor = reshape([3.0, 5.0, 13.0, 18.0, 14.0, 18.0, 44.0, 54.0], 2, 2, 2)
     expected = reshape([1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0], 2, 2, 2)
     @test NCPLS.normalize_predictors(Xtensor, tensor_mf) ≈ expected
