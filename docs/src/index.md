@@ -6,10 +6,10 @@ discriminant analysis of tensor-valued predictors. This method extends the CPLS 
 introduced by Indahl et al. (2009), which was originally designed for matrix-shaped 
 predictors.
 
-The matrix-based approach is implemented in the Julia package CPPLS, which incorporates 
-the "power" parameter extension outlined by Liland & Indahl (2009)—hence the additional "P" 
-in the name. Much like CPPLS, NCPLS allows users to provide auxiliary responses and 
-observation weights to guide and refine the extraction of latent variables.
+The matrix-based approach is implemented in the Julia package CPPLS.jl, which incorporates 
+the "power" parameter extension outlined by Indahl (2009) and Liland & Indahl (2009)—hence 
+the additional "P" in the acronym. Much like CPPLS, NCPLS allows users to provide auxiliary 
+responses and observation weights to guide and refine the extraction of latent variables.
 
 ## Installation
 
@@ -52,8 +52,9 @@ errors, omissions, or any consequences arising from use of the software, includi
 in regulated, clinical, or safety-critical contexts.
 
 ## References
-
-- Indahl UG, Liland KH, Naes T (2009) Canonical partial least squares — a unified PLS 
+- Indahl UG (2005): A twist to partial least squares regression. *Journal of Chemometrics* 
+  19: 32–44. https://doi.org/10.1002/cem.904.
+- Indahl UG, Liland KH, Naes T (2009): Canonical partial least squares — a unified PLS 
   approach to classification and regression problems. *Journal of Chemometrics* 23: 495-504. 
   https://doi.org/10.1002/cem.1243.
 - Liland KH, Indahl UG (2009): Powered partial least squares discriminant analysis. 
