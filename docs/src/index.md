@@ -59,7 +59,7 @@ in regulated, clinical, or safety-critical contexts.
 - Liland KH, Indahl UG (2009): Powered partial least squares discriminant analysis. 
   *Journal of Chemometrics* 23: 7-18. https://doi.org/10.1002/cem.1186.
 - Liland KH, Indahl UG, Skogholt J, Mishra P (2022): The canonical partial least squares 
-  approach to analysing multiway datasets — N-CPLS. *Journal of Chemometrics* 36: e3432. 
+  approach to analysing multiway datasets—N-CPLS. *Journal of Chemometrics* 36: e3432. 
   https://doi.org/10.1002/cem.3432.
 - Smit S, van Breemen MJ, Hoefsloot HCJ, Smilde AK, Aerts JMFG, de Koster CG (2007): 
   Assessing the statistical validity of proteomics based biomarkers. *Analytica Chimica 
