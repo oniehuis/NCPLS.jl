@@ -36,6 +36,12 @@ end
 @testset "scoreplot fit wrapper validates metadata and component count" begin
     mf = mock_scoreplot_fit()
 
+    @test_throws ErrorException NCPLS.scoreplot(
+        ["s1", "s2"],
+        ["A", "B"],
+        [1.0 2.0; 3.0 4.0];
+        backend = :unknown,
+    )
     @test_throws ArgumentError NCPLS.scoreplot(
         mock_scoreplot_fit(sampleclasses = nothing);
         backend = :plotly,

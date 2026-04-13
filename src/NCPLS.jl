@@ -3,12 +3,11 @@ module NCPLS
 using LinearAlgebra
 using Random
 using Statistics
-import CPPLS
 import StatsAPI: fit, predict, fitted, coef, residuals
-import CPPLS: cca_coeffs_and_corr, scoreplot
 
 include("NCPLS/types.jl")
 include("NCPLS/computations.jl")
+include("NCPLS/cca.jl")
 include("NCPLS/fit.jl")
 include("NCPLS/landscape.jl")
 include("NCPLS/scoreplot.jl")

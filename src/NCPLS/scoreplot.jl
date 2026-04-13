@@ -1,17 +1,52 @@
 """
+    scoreplot(samples, groups, scores; backend=:plotly, kwargs...)
     scoreplot(mf::NCPLSFit; backend=:plotly, kwargs...)
 
-Equivalent of `CPPLS.scoreplot(cppls)` for fitted NCPLS models. The method forwards to
-`CPPLS.scoreplot(samples, groups, scores; ...)` after reading `samplelabels`,
-`sampleclasses`, and the first two predictor scores from the NCPLS fit.
+Backend dispatcher for NCPLS score plots.
+
+The raw method accepts sample labels, grouping labels, and a score matrix with at least
+two columns. The fit method reads `samplelabels`, `sampleclasses`, and the first two
+predictor scores from an `NCPLSFit`.
 
 Requirements
+- `scores` must have at least two columns.
 - `sampleclasses(mf)` must be present.
 - The fitted model must contain at least two latent variables.
 
-All backend-specific keyword arguments accepted by `CPPLS.scoreplot` are forwarded
-unchanged.
+General keywords
+- `backend::Symbol = :plotly`
+  Select the plotting backend. Supported values: `:plotly`.
 """
+function scoreplot end
+
+function scoreplot_plotly end
+
+function _require_scoreplot_extension(extsym::Symbol, pkg::AbstractString)
+    Base.get_extension(@__MODULE__, extsym) === nothing &&
+        error("Backend $(pkg) not loaded. Run `using $(pkg)` first.")
+    return nothing
+end
+
+const _require_scoreplot_extension_ref = Ref{Function}(_require_scoreplot_extension)
+const _scoreplot_plotly_ref = Ref{Function}(
+    (samples, groups, scores; kwargs...) -> scoreplot_plotly(samples, groups, scores; kwargs...)
+)
+
+function scoreplot(
+    samples::AbstractVector{<:AbstractString},
+    groups,
+    scores::AbstractMatrix{<:Real};
+    backend::Symbol = :plotly,
+    kwargs...,
+)
+    if backend === :plotly
+        _require_scoreplot_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
+        return _scoreplot_plotly_ref[](samples, groups, scores; kwargs...)
+    else
+        error("Unknown backend")
+    end
+end
+
 function scoreplot(
     mf::NCPLSFit;
     backend::Symbol=:plotly,
@@ -28,5 +63,5 @@ function scoreplot(
         "Refit with ncomponents >= 2 or call scoreplot(samples, groups, scores) with a custom 2-column score matrix."
     ))
 
-    CPPLS.scoreplot(samplelabels(mf), groups, xscores(mf, 1:2); backend = backend, kwargs...)
+    scoreplot(samplelabels(mf), groups, xscores(mf, 1:2); backend = backend, kwargs...)
 end

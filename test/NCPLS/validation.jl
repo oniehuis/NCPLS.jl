@@ -4,9 +4,7 @@ if !isdefined(NCPLS, :synthetic_gcms_regression_data)
         "synthetic_gcms.jl",
         "synthetic_multilinear.jl",
         "analysis_helpers.jl",
-        "cppls_analysis.jl",
         "ncpls_analysis.jl",
-        "model_comparison.jl",
         "multilinear_comparison.jl",
         "mode_weight_orthogonalization.jl",
         "multilinear_init_assessment.jl",
@@ -20,7 +18,6 @@ if !isdefined(NCPLS, :synthetic_gcms_regression_data)
 end
 
 import Random
-import CPPLS
 import LinearAlgebra: norm
 import Statistics: mean
 
@@ -184,71 +181,6 @@ end
     @test_throws ArgumentError NCPLS.synthetic_gcms_regression_data(n_compounds = 2, additional_compounds = [3])
 end
 
-@testset "analyze_synthetic_gcms_with_cppls fits unfolded CPPLS and returns regression diagnostics" begin
-    data = NCPLS.synthetic_gcms_regression_data(
-        nsamples = 12,
-        n_rt = 8,
-        n_mz = 6,
-        n_compounds = 4,
-        target_compounds = [1, 3],
-        additional_compounds = [2],
-        baseline = 0.5,
-        rng = Random.MersenneTwister(2),
-    )
-
-    result = NCPLS.analyze_synthetic_gcms_with_cppls(
-        data;
-        ncomponents = 2,
-        test_fraction = 0.25,
-        rng = Random.MersenneTwister(3),
-    )
-
-    @test result.cpplsfit isa CPPLS.CPPLSFit
-    @test result.cppls_model.gamma == 0.5
-    @test result.cppls_model.mode == :regression
-    @test sort(vcat(result.train_idx, result.test_idx)) == collect(1:size(data.X, 1))
-    @test isempty(intersect(result.train_idx, result.test_idx))
-
-    @test size(result.Xtrain) == (length(result.train_idx), prod(size(data.X)[2:end]))
-    @test size(result.Xtest) == (length(result.test_idx), prod(size(data.X)[2:end]))
-    @test result.Ytrain ≈ data.Yprim[result.train_idx, :]
-    @test result.Ytest ≈ data.Yprim[result.test_idx, :]
-    @test result.Yaux_train ≈ data.Yadd[result.train_idx, :]
-    @test result.Yaux_test ≈ data.Yadd[result.test_idx, :]
-    @test result.predictorlabels[1] == "rt1_mz1"
-    @test result.predictorlabels[end] == "rt8_mz6"
-    @test result.responselabels == ["compound_1", "compound_3"]
-
-    @test size(result.scores_train) == (length(result.train_idx), 2)
-    @test size(result.scores_test) == (length(result.test_idx), 2)
-    @test size(result.Yhat_train) == (length(result.train_idx), size(data.Yprim, 2), 2)
-    @test size(result.Yhat_test) == (length(result.test_idx), size(data.Yprim, 2), 2)
-    @test size(result.rmse_train) == (size(data.Yprim, 2), 2)
-    @test size(result.rmse_test) == (size(data.Yprim, 2), 2)
-    @test size(result.r2_train) == (size(data.Yprim, 2), 2)
-    @test size(result.r2_test) == (size(data.Yprim, 2), 2)
-    @test length(result.rmse_train_overall) == 2
-    @test length(result.rmse_test_overall) == 2
-    @test length(result.r2_train_overall) == 2
-    @test length(result.r2_test_overall) == 2
-    @test all(isfinite, result.rmse_train)
-    @test all(isfinite, result.rmse_test)
-end
-
-@testset "analyze_synthetic_gcms_with_cppls validates split settings" begin
-    data = NCPLS.synthetic_gcms_regression_data(
-        nsamples = 8,
-        n_rt = 6,
-        n_mz = 5,
-        n_compounds = 3,
-        target_compounds = [1],
-        rng = Random.MersenneTwister(4),
-    )
-
-    @test_throws ArgumentError NCPLS.analyze_synthetic_gcms_with_cppls(data; test_fraction = 0.0)
-    @test_throws ArgumentError NCPLS.analyze_synthetic_gcms_with_cppls(data; test_fraction = 1.0)
-end
-
 @testset "analyze_synthetic_gcms_with_ncpls fits NCPLS and returns regression diagnostics" begin
     data = NCPLS.synthetic_gcms_regression_data(
         nsamples = 12,
@@ -321,46 +253,6 @@ end
 
     @test result.ncplsfit.W_modes isa AbstractVector
     @test result.ncplsfit.model.multilinear === true
-end
-
-@testset "compare_synthetic_gcms_models uses a shared split and returns agreement summaries" begin
-    data = NCPLS.synthetic_gcms_regression_data(
-        nsamples = 14,
-        n_rt = 8,
-        n_mz = 6,
-        n_compounds = 4,
-        target_compounds = [1, 3],
-        additional_compounds = [2],
-        baseline = 0.5,
-        rng = Random.MersenneTwister(9),
-    )
-
-    result = NCPLS.compare_synthetic_gcms_models(
-        data;
-        ncomponents = 2,
-        test_fraction = 0.25,
-        rng = Random.MersenneTwister(10),
-    )
-
-    @test result.common_ncomponents == 2
-    @test result.train_idx == result.cppls.train_idx
-    @test result.train_idx == result.ncpls.train_idx
-    @test result.test_idx == result.cppls.test_idx
-    @test result.test_idx == result.ncpls.test_idx
-    @test result.ncpls.ncpls_model.center_Yprim === false
-    @test result.ncpls.ncpls_model.multilinear === true
-    @test length(result.prediction_rmse_train) == 2
-    @test length(result.prediction_rmse_test) == 2
-    @test length(result.prediction_cor_train) == 2
-    @test length(result.prediction_cor_test) == 2
-    @test length(result.score_abs_cor_train) == 2
-    @test length(result.score_abs_cor_test) == 2
-    @test length(result.rmse_test_delta) == 2
-    @test length(result.r2_test_delta) == 2
-    @test all(result.prediction_rmse_train .>= 0)
-    @test all(result.prediction_rmse_test .>= 0)
-    @test all(w -> w in (:cppls, :ncpls, :tie), result.better_model_test_rmse)
-    @test all(w -> w in (:cppls, :ncpls, :tie), result.better_model_test_r2)
 end
 
 @testset "compare_synthetic_multilinear_models returns prediction and structure summaries" begin

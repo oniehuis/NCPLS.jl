@@ -9,6 +9,10 @@ end
     include(joinpath("NCPLS", "computations.jl"))
 end
 
+@testset "NCPLS/cca.jl" begin
+    include(joinpath("NCPLS", "cca.jl"))
+end
+
 @testset "NCPLS/fit.jl" begin
     include(joinpath("NCPLS", "fit.jl"))
 end
