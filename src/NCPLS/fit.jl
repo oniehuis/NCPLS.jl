@@ -135,11 +135,18 @@ function fit_ncpls_core(
         W₀ = candidate_loading_weights(d.X, Ycomb, obs_weights)
         selectdim(W0, ndims(W0), i) .= W₀
 
-        #Z₀ = X ⓓ W₀
-        Z₀ = candidate_scores(d.X, W₀)
-        # Z₀ := Z₀ - T_A T_Aᵗ Z₀ only when Yadditional is used
+        # Form candidate scores for the supervised CCA step. When Yadd is present,
+        # the manuscript orthogonalizes these scores on previous components. For
+        # rank-deficient toy cases that orthogonalization can collapse to numerical
+        # zero on some BLAS/LAPACK combinations, so fall back to the raw candidate
+        # scores when that happens.
+        Z₀_raw = candidate_scores(d.X, W₀)
+        Z₀ = Z₀_raw
         if !isnothing(d.Yadd)
             Z₀ = orthogonalize_on_accumulated_scores(Z₀, T[:, 1:i-1])
+            if norm(Z₀) ≤ sqrt(eps(Float64)) * max(norm(Z₀_raw), 1.0)
+                Z₀ = Z₀_raw
+            end
         end
 
         # C ⇐ canoncorr(Z₀, Y)

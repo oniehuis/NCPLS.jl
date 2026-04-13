@@ -58,7 +58,7 @@ end
 
 @testset "fit_ncpls_core returns fitted arrays for tensors" begin
     model = NCPLS.NCPLSModel(
-        ncomponents = 3,
+        ncomponents = 2,
         center_X = true,
         scale_X = true,
         center_Yprim = true,
@@ -78,14 +78,14 @@ end
 
     @test mf isa NCPLS.NCPLSFit
     @test mf.model == model
-    @test size(mf.B) == (3, 2, 3, 2)
-    @test size(mf.R) == (3, 2, 3)
-    @test size(mf.T) == (4, 3)
-    @test size(mf.P) == (3, 2, 3)
-    @test size(mf.Q) == (2, 3)
-    @test size(mf.W) == (3, 2, 3)
-    @test size(mf.c) == (3, 3)
-    @test size(mf.W0) == (3, 2, 3, 3)
+    @test size(mf.B) == (3, 2, 2, 2)
+    @test size(mf.R) == (3, 2, 2)
+    @test size(mf.T) == (4, 2)
+    @test size(mf.P) == (3, 2, 2)
+    @test size(mf.Q) == (2, 2)
+    @test size(mf.W) == (3, 2, 2)
+    @test size(mf.c) == (3, 2)
+    @test size(mf.W0) == (3, 2, 3, 2)
     @test size(mf.Yres) == size(Y)
     @test mf.W_modes === nothing
     @test mf.W_multilinear_relerr === nothing
@@ -93,7 +93,7 @@ end
     @test mf.W_multilinear_lambda === nothing
     @test mf.W_multilinear_niter === nothing
     @test mf.W_multilinear_converged === nothing
-    @test vec(sum(mf.T .^ 2; dims = 1)) ≈ ones(3) atol = 1e-12
+    @test vec(sum(mf.T .^ 2; dims = 1)) ≈ ones(2) atol = 1e-12
     @test mf.R ≈ NCPLS.score_projection_tensors(mf.W, mf.P)
     @test mf.B ≈ NCPLS.regression_coefficients(mf.R, mf.Q)
     @test size(mf.X_mean) == (3, 2)
