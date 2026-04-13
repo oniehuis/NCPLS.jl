@@ -1,4 +1,5 @@
 import Random
+import LinearAlgebra: pinv
 
 @testset "candidate_loading_weights returns matrix-shaped weights for matrix X" begin
     X = Float64[
@@ -536,6 +537,24 @@ end
 
     @test err isa DimensionMismatch
     @test occursin("W_A and P_A must have the same dimensions", sprint(showerror, err))
+end
+
+@testset "score_projection_tensors falls back to pseudoinverse for singular systems" begin
+    W_A = Float64[
+        1 1
+        2 2
+        3 3
+    ]
+    P_A = Float64[
+        2 2
+        1 1
+        0 0
+    ]
+
+    R = NCPLS.score_projection_tensors(W_A, P_A)
+    expected = W_A * pinv(P_A' * W_A)
+
+    @test R ≈ expected
 end
 
 @testset "regression_coefficients matches cumulative component contributions for matrix predictors" begin

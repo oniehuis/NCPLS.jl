@@ -219,7 +219,16 @@ function score_projection_tensors(
     P_Am = reshape(P_A, :, A)
 
     M = P_Am' * W_Am
-    Rm = W_Am * inv(M)
+    M_inv = try
+        inv(M)
+    catch err
+        if err isa SingularException
+            pinv(M)
+        else
+            rethrow()
+        end
+    end
+    Rm = W_Am * M_inv
 
     reshape(Rm, size(W_A)...)
 end

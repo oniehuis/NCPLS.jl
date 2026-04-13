@@ -171,11 +171,15 @@ function fit_ncpls_core(
 
         selectdim(W_A, ndims(W_A), i) .= Wᵒ
 
-        # t = X ⓓ Wᵒ
-        t = score_vector(d.X, Wᵒ)
-        # t = X ⓓ Wᵒ
-        t  = orthogonalize_on_accumulated_scores(t,  T[:, 1:i-1])
-        # t := t / ||t||
+        # Form the score vector and orthogonalize it on previous components.
+        # In rank-deficient toy cases the orthogonalized vector can collapse to
+        # numerical zero; fall back to the raw score direction in that case so
+        # component extraction remains well-defined across Julia versions.
+        t_raw = score_vector(d.X, Wᵒ)
+        t = orthogonalize_on_accumulated_scores(t_raw, T[:, 1:i-1])
+        if norm(t) ≤ sqrt(eps(Float64)) * max(norm(t_raw), 1.0)
+            t = t_raw
+        end
         t = normalize_vector(t)
         T[:, i] = t
 
