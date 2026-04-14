@@ -4,11 +4,16 @@ using LinearAlgebra
 using Random
 using Statistics
 import StatsAPI: fit, predict, fitted, coef, residuals
+using CategoricalArrays
+
+using Reexport: @reexport
+@reexport using CategoricalArrays
 
 include("NCPLS/types.jl")
 include("NCPLS/computations.jl")
 include("NCPLS/cca.jl")
 include("NCPLS/fit.jl")
+include("NCPLS/fit_light.jl")
 include("NCPLS/landscape.jl")
 include("NCPLS/scoreplot.jl")
 include("NCPLS/preprocessing.jl")

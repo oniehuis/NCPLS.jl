@@ -12,19 +12,35 @@
         verbose::Bool=false
     ) -> NCPLSFit
 
-Fit an NCPLS model to predictors `X` and primary responses `Yprim`. The model object `m`
-controls the number of components, centering and scaling of `X`, centering of `Yprim`,
-whether the multilinear loading-weight branch is used, whether mode weights are
-orthogonalized on previous components, and the PARAFAC control settings
-`multilinear_maxiter`, `multilinear_tol`, `multilinear_init`, and
-`multilinear_seed`.
+Fit a NCPLS model using the StatsAPI entry point and an explicit NCPLSModel. The model
+specification supplies the number of components, centering and scaling, whether the 
+multilinear loading-weight branch is used, whether mode weights are orthogonalized on 
+previous components, the analysis mode, and and the PARAFAC control settings
+`multilinear_maxiter`, `multilinear_tol`, `multilinear_init`, and `multilinear_seed`, while 
+the call to `fit` supplies data, optional weights, additional responses, and label metadata.
 
-`Yadd` may be used to supply additional responses that influence the loading-weight
-calculation but are not predicted. `obs_weights` applies sample weights during
-preprocessing and the candidate-weight and CCA steps. Optional `samplelabels`,
+When `Yprim` is provided, it is treated as the primary response block. When
+`sampleclasses` is provided, the labels are converted to a one-hot response matrix,
+class names are inferred as response labels, and the fit is forced to discriminant
+analysis; `m.analysis_mode` must be `:discriminant` or an ArgumentError is thrown.
+
+Optional `samplelabels`,
 `responselabels`, `sampleclasses`, and `predictoraxes` metadata are stored on the fitted
 object for downstream plotting and interpretation. If `verbose=true`, iteration progress
 from the PARAFAC step is printed when `m.multilinear` is enabled.
+
+
+Keyword arguments accepted by `fit` include `obs_weights` for per-sample weighting,
+`Yadd` for additional response columns, and optional `samplelabels`,
+`responselabels`, `sampleclasses`, and `predictoraxes` metadata are stored on the fitted
+object for downstream plotting and interpretation. If `verbose=true`, iteration progress
+from the PARAFAC step is printed when `m.multilinear` is enabled. `Yadd` must have the same 
+number of rows as `X` and is concatenated to `Yprim` internally to build the supervised 
+projection, while prediction targets always remain the primary responses.
+
+The return value is a `NCPLSFit` containing scores, loadings, regression coefficients,
+and the metadata needed for downstream prediction and diagnostics. Use `NCPLS.fit` or
+`StatsAPI.fit` when disambiguation is required in your namespace.
 """
 function fit(
     m::NCPLSModel,
@@ -32,35 +48,26 @@ function fit(
     Yprim::AbstractMatrix{<:Real};
     kwargs...
 )
-    fit_ncpls_core(m, X, Yprim; kwargs...)
+    fit_ncpls(m, X, Yprim; kwargs...)
 end
 
-"""
-    fit_ncpls_light(
-        m::NCPLSModel,
-        X::AbstractArray{<:Real},
-        Yprim::AbstractMatrix{<:Real};
-        Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
-        obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
-        samplelabels::AbstractVector=String[],
-        responselabels::AbstractVector=String[],
-        sampleclasses::Union{AbstractVector, Nothing}=nothing,
-        predictoraxes=(),
-        verbose::Bool=false
-    ) -> NCPLSFitLight
-
-Low-level NCPLS fitting routine used by internal cross-validation helpers that returns an
-`NCPLSFitLight`. The keyword interface mirrors [`fit`](@ref) for compatibility with
-fold-local cross-validation kwargs, but the reduced fit stores only prediction-critical
-state.
-"""
-function fit_ncpls_light(
+function fit(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
-    Yprim::AbstractMatrix{<:Real};
+    sampleclasses::AbstractCategoricalArray{T,1,R,V,C,U};
+    kwargs...
+) where {T,R,V,C,U}
+
+    fit_ncpls(m, X, sampleclasses; kwargs...)
+end
+
+function fit(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    sampleclasses::AbstractVector;
     kwargs...
 )
-    fit_ncpls_light_core(m, X, Yprim; kwargs...)
+    fit_ncpls(m, X, sampleclasses; kwargs...)
 end
 
 """
@@ -264,27 +271,7 @@ function fit_ncpls_core(
     )
 end
 
-"""
-    fit_ncpls_light_core(
-        m::NCPLSModel,
-        X::AbstractArray{<:Real},
-        Yprim::AbstractMatrix{<:Real};
-        Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
-        obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
-        samplelabels::AbstractVector=String[],
-        responselabels::AbstractVector=String[],
-        sampleclasses::Union{AbstractVector, Nothing}=nothing,
-        predictoraxes=(),
-        verbose::Bool=false
-    ) -> NCPLSFitLight
-
-Fit an NCPLS model and return a reduced prediction-only fit object.
-
-This is the low-level fitting routine used by internal cross-validation helpers. The
-keyword interface mirrors [`fit_ncpls_core`](@ref) so fold-local fit kwargs continue to
-work, even though metadata fields are not stored on the reduced fit.
-"""
-function fit_ncpls_light_core(
+function fit_ncpls(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
     Yprim::AbstractMatrix{<:Real};
@@ -295,85 +282,128 @@ function fit_ncpls_light_core(
     sampleclasses::T5=nothing,
     predictoraxes=(),
     verbose::Bool=false
+
 ) where {
-    T1<:Union{AbstractMatrix{<:Real}, Nothing},
+    T1<:Union{LinearAlgebra.AbstractVecOrMat{<:Real}, Nothing},
     T2<:Union{AbstractVector{<:Real}, Nothing},
     T3<:AbstractVector,
     T4<:AbstractVector,
-    T5<:Union{AbstractVector, Nothing},
+    T5<:Union{AbstractVector, Nothing}
 }
 
-    d = preprocess(m, X, Yprim, Yadd, obs_weights)
+    fit_ncpls_core(m, X, Yprim;
+        Yadd=Yadd, 
+        obs_weights=obs_weights, 
+        samplelabels=samplelabels,
+        responselabels=responselabels,
+        sampleclasses=sampleclasses,
+        predictoraxes=predictoraxes, 
+        verbose=verbose
+    )
+end
 
-    T = zeros(Float64, size(d.X, 1), m.ncomponents)
-    P = Array{Float64}(undef, size(d.X)[2:end]..., m.ncomponents)
-    Q = Matrix{Float64}(undef, size(d.Yprim, 2), m.ncomponents)
-    W_A = Array{Float64}(undef, size(d.X)[2:end]..., m.ncomponents)
-    W_modes = if m.multilinear
-        [
-            Array{Float64}(undef, size(d.X, j + 1), m.ncomponents)
-            for j in 1:(ndims(d.X) - 1)
-        ]
-    else
-        nothing
-    end
-    rng = m.multilinear ? MersenneTwister(m.multilinear_seed) : nothing
+function fit_ncpls(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    Yprim::AbstractVector{<:Real};
+    Yadd::T1=nothing,
+    obs_weights::T2=nothing,
+    samplelabels::T3=String[],
+    responselabels::T4=String[],
+    sampleclasses::T5=nothing,
+    predictoraxes=(),
+    verbose::Bool=false
+) where {
+    T1<:Union{LinearAlgebra.AbstractVecOrMat, Nothing},
+    T2<:Union{AbstractVector{<:Real}, Nothing},
+    T3<:AbstractVector,
+    T4<:AbstractVector,
+    T5<:Union{AbstractVector, Nothing}
+}
+    Yprim_matrix = reshape(Yprim, :, 1)
 
-    cca_obs_weights = isnothing(obs_weights) ? nothing : sqrt.(obs_weights)
+    # Hier wurde analysis_mode=:regression an fit_cppls_core übergeben. Relevant?
 
-    Y = copy(d.Yprim)
-    for i = 1:m.ncomponents
-        Ycomb = isnothing(d.Yadd) ? Y : hcat(Y, d.Yadd)
-        W₀ = candidate_loading_weights(d.X, Ycomb, obs_weights)
+    fit_ncpls_core(m, X, Yprim_matrix;
+        Yadd=Yadd, 
+        obs_weights=obs_weights, 
+        samplelabels=samplelabels,
+        responselabels=responselabels,
+        sampleclasses=sampleclasses,
+        predictoraxes=predictoraxes, 
+        verbose=verbose
+    )
+end
 
-        Z₀_raw = candidate_scores(d.X, W₀)
-        Z₀ = Z₀_raw
-        if !isnothing(d.Yadd)
-            Z₀ = orthogonalize_on_accumulated_scores(Z₀, T[:, 1:i-1])
-            if norm(Z₀) ≤ sqrt(eps(Float64)) * max(norm(Z₀_raw), 1.0)
-                Z₀ = Z₀_raw
-            end
-        end
 
-        C, _, _ = cca_coeffs_and_corr(Z₀, Y, cca_obs_weights)
-        W = loading_weights(W₀, C[:, 1])
+function fit_ncpls(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    sampleclasses::AbstractCategoricalArray{T,1,R,V,C,U};
+    kwargs...
+) where {T,R,V,C,U}
 
-        if m.multilinear
-            W_modes_prev = [W_modes[j][:, 1:i-1] for j in eachindex(W_modes)]
-            ml = multilinear_loading_weight_tensor(W, W_modes_prev, m, rng; verbose=verbose)
+    m.analysis_mode ≡ :discriminant || throw(ArgumentError(
+        "NCPLSModel must use analysis_mode=:discriminant when fitting from sampleclasses."))
+    
+    fit_ncpls_from_sample_classes(m, X, sampleclasses; kwargs...)
+end
 
-            for j in eachindex(W_modes)
-                W_modes[j][:, i] = ml.factors[j]
-            end
+function fit_ncpls(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    sampleclasses::AbstractVector;
+    kwargs...
+)
+    m.analysis_mode ≡ :discriminant || throw(ArgumentError(
+        "NCPLSModel must use analysis_mode=:discriminant when fitting from sampleclasses."))
+    
+    fit_ncpls_from_sample_classes(m, X, sampleclasses; kwargs...)
+end
 
-            Wᵒ = ml.Wᵒ
-        else
-            Wᵒ = W
-        end
+"""
+    fit_ncpls_from_sample_classes(
+        m::NCPLSModel,
+        X::AbstractArray{<:Real},
+        sampleclasses,
+        ncomponents::Int=2;
+        kwargs...
+    )
 
-        selectdim(W_A, ndims(W_A), i) .= Wᵒ
+Internal helper that converts class labels to a one-hot response matrix before fitting
+and is primarily used by the label-based `fit_cppls` wrappers. Prefer `fit` for user
+documentation and public entry points.
+"""
+function fit_ncpls_from_sample_classes(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    sampleclasses;
+    Yadd::T1=nothing,
+    obs_weights::T2=nothing,
+    samplelabels::T3=String[],
+    responselabels::T4=String[],
+    predictoraxes=(),
+    verbose::Bool=false
+) where {
+    T1<:Union{LinearAlgebra.AbstractVecOrMat, Nothing},
+    T2<:Union{AbstractVector{<:Real}, Nothing},
+    T3<:AbstractVector,
+    T4<:AbstractVector
+}
+    isempty(responselabels) || throw(ArgumentError("`responselabels` cannot be provided" *
+        " when passing sample classes; response labels are inferred automatically."))
 
-        t_raw = score_vector(d.X, Wᵒ)
-        t = orthogonalize_on_accumulated_scores(t_raw, T[:, 1:i-1])
-        if norm(t) ≤ sqrt(eps(Float64)) * max(norm(t_raw), 1.0)
-            t = t_raw
-        end
-        t = normalize_vector(t)
-        T[:, i] = t
+    Yprim, classes = onehot(sampleclasses)
 
-        Pᵢ = loading_tensor(d.X, t)
-        selectdim(P, ndims(P), i) .= Pᵢ
-
-        q = response_loading_vector(Y, t)
-        Q[:, i] = q
-
-        deflate_responses!(Y, t, q)
-    end
-
-    R = score_projection_tensors(W_A, P)
-    B = regression_coefficients(R, Q)
-
-    NCPLSFitLight(B, d.X_mean, d.X_std, d.Yprim_mean)
+    fit_ncpls_core(m, X, Yprim;
+        Yadd=Yadd, 
+        obs_weights=obs_weights, 
+        samplelabels=samplelabels,
+        responselabels=classes,
+        sampleclasses=copy(sampleclasses),
+        predictoraxes=predictoraxes, 
+        verbose=verbose
+    )
 end
 
 function validate_label_length(
