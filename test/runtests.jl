@@ -33,6 +33,10 @@ end
     include(joinpath("NCPLS", "preprocessing.jl"))
 end
 
+@testset "NCPLS/crossvalidation.jl" begin
+    include(joinpath("NCPLS", "crossvalidation.jl"))
+end
+
 @testset "NCPLS/validation.jl" begin
     include(joinpath("NCPLS", "validation.jl"))
 end

@@ -13,6 +13,7 @@ include("NCPLS/landscape.jl")
 include("NCPLS/scoreplot.jl")
 include("NCPLS/preprocessing.jl")
 include("NCPLS/predict.jl")
+include("NCPLS/crossvalidation.jl")
 
 export AbstractNCPLSFit
 export NCPLSFit
@@ -24,16 +25,30 @@ export coefflandscapeplot
 export coefficientlandscape
 export fit
 export fitted
+export invfreqweights
 export landscapeplot
+export nestedcv
+export nestedcvperm
+export nmc
 export ncomponents
+export onehot
+export outlierscan
+export permda
+export permreg
+export pvalue
 export predict
 export predictoraxes
 export project
+export random_batch_indices
 export residuals
 export responselabels
 export sampleclasses
 export samplelabels
 export scoreplot
+export cv_classification
+export cv_regression
+export cvda
+export cvreg
 export weightlandscape
 export weightlandscapeplot
 export weightprofiles
