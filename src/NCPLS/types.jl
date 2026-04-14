@@ -16,6 +16,7 @@ struct NCPLSModel
     multilinear_tol::Float64
     multilinear_init::Symbol
     multilinear_seed::Int
+    analysis_mode::Symbol
 end
 
 """
@@ -29,7 +30,8 @@ end
         multilinear_maxiter::Int=500,
         multilinear_tol::Float64=1e-10,
         multilinear_init::Symbol=:hosvd,
-        multilinear_seed::Int=1
+        multilinear_seed::Int=1,
+        analysis_mode::Symbol=:regression
     )
 
 Construct an `NCPLSModel` with the given fitting options. By default, the multilinear
@@ -51,7 +53,8 @@ function NCPLSModel(;
     multilinear_maxiter::Int=500,
     multilinear_tol::Float64=1e-10,
     multilinear_init::Symbol=:hosvd,
-    multilinear_seed::Int=1
+    multilinear_seed::Int=1,
+    analysis_mode::Symbol=:regression
 ) where {
         T1<:Integer
     }
@@ -73,6 +76,7 @@ function NCPLSModel(;
         multilinear_tol,
         multilinear_init,
         multilinear_seed,
+        analysis_mode
     )
 end
 
@@ -88,6 +92,7 @@ function Base.show(io::IO, m::NCPLSModel)
         ", multilinear_tol=", m.multilinear_tol,
         ", multilinear_init=", repr(m.multilinear_init),
         ", multilinear_seed=", m.multilinear_seed,
+        ", analysis_mode=", repr(m.analysis_mode),
         ")")
 end
 
@@ -103,6 +108,7 @@ function Base.show(io::IO, ::MIME"text/plain", m::NCPLSModel)
     println(io, "  multilinear_tol: ", m.multilinear_tol)
     println(io, "  multilinear_init: ", m.multilinear_init)
     println(io, "  multilinear_seed: ", m.multilinear_seed)
+    println(io, "  analysis_mode: ", m.analysis_mode)
 end
 
 """
