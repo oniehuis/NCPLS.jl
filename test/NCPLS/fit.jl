@@ -154,6 +154,83 @@ end
     @test via_wrapper.predictoraxes == via_core.predictoraxes
 end
 
+@testset "fit_ncpls_light matches full prediction essentials" begin
+    model = NCPLS.NCPLSModel(
+        ncomponents = 2,
+        center_X = true,
+        scale_X = true,
+        center_Yprim = true,
+        multilinear = false,
+    )
+    X = Float64[
+        2 1 0
+        0 3 1
+        4 5 2
+        1 4 3
+    ]
+    Y = Float64[
+        1 0
+        0 1
+        1 1
+        0 1
+    ]
+    Yadd = Float64[
+        1 3
+        2 4
+        3 5
+        4 6
+    ]
+    weights = [1.0, 2.0, 1.0, 0.5]
+    predictoraxes = [NCPLS.PredictorAxis("axis1", [1.0, 2.0, 3.0])]
+
+    full = NCPLS.fit_ncpls_core(
+        model,
+        X,
+        Y;
+        Yadd = Yadd,
+        obs_weights = weights,
+        samplelabels = ["s1", "s2", "s3", "s4"],
+        responselabels = ["r1", "r2"],
+        sampleclasses = ["A", "B", "A", "B"],
+        predictoraxes = predictoraxes,
+    )
+    light = NCPLS.fit_ncpls_light_core(
+        model,
+        X,
+        Y;
+        Yadd = Yadd,
+        obs_weights = weights,
+        samplelabels = ["s1", "s2", "s3", "s4"],
+        responselabels = ["r1", "r2"],
+        sampleclasses = ["A", "B", "A", "B"],
+        predictoraxes = predictoraxes,
+    )
+    light_wrapper = NCPLS.fit_ncpls_light(
+        model,
+        X,
+        Y;
+        Yadd = Yadd,
+        obs_weights = weights,
+        samplelabels = ["s1", "s2", "s3", "s4"],
+        responselabels = ["r1", "r2"],
+        sampleclasses = ["A", "B", "A", "B"],
+        predictoraxes = predictoraxes,
+    )
+
+    @test light isa NCPLS.NCPLSFitLight
+    @test light.B ≈ full.B
+    @test light.X_mean ≈ full.X_mean
+    @test light.X_std ≈ full.X_std
+    @test light.Yprim_mean ≈ full.Yprim_mean
+    @test NCPLS.predict(light, X) ≈ NCPLS.predict(full, X)
+
+    @test light_wrapper isa NCPLS.NCPLSFitLight
+    @test light_wrapper.B ≈ full.B
+    @test light_wrapper.X_mean ≈ full.X_mean
+    @test light_wrapper.X_std ≈ full.X_std
+    @test light_wrapper.Yprim_mean ≈ full.Yprim_mean
+end
+
 @testset "fit paths handle optional Yadd and surface preprocessing validation errors" begin
     model = NCPLS.NCPLSModel(multilinear = false)
     X_matrix = rand(4, 2)
@@ -176,6 +253,15 @@ end
     @test mf_no_yadd.W_multilinear_niter === nothing
     @test mf_no_yadd.W_multilinear_converged === nothing
 
+    mf_no_yadd_light = NCPLS.fit_ncpls_light_core(
+        model,
+        X_matrix,
+        Y;
+        obs_weights = nothing,
+    )
+    @test mf_no_yadd_light isa NCPLS.NCPLSFitLight
+    @test mf_no_yadd_light.B ≈ mf_no_yadd.B
+
     err_x_yprim = try
         NCPLS.fit_ncpls_core(
             model,
@@ -191,7 +277,29 @@ end
     @test err_x_yprim isa DimensionMismatch
     @test occursin("Number of rows in X and Yprim must be equal", sprint(showerror, err_x_yprim))
 
+    err_x_yprim_light = try
+        NCPLS.fit_ncpls_light_core(
+            model,
+            X_matrix,
+            Y[1:3, :];
+            Yadd = Yadd,
+            obs_weights = nothing,
+        )
+        nothing
+    catch err
+        err
+    end
+    @test err_x_yprim_light isa DimensionMismatch
+
     @test_throws ArgumentError NCPLS.fit_ncpls_core(
+        model,
+        X_tensor,
+        Y;
+        Yadd = Yadd,
+        obs_weights = [1.0, -1.0, 1.0, 1.0],
+    )
+
+    @test_throws ArgumentError NCPLS.fit_ncpls_light_core(
         model,
         X_tensor,
         Y;

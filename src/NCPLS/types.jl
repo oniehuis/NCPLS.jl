@@ -154,6 +154,34 @@ Abstract supertype for fitted NCPLS models.
 abstract type AbstractNCPLSFit end
 
 """
+    NCPLSFitLight{TB, TXStat, TYStat}
+
+Reduced fitted NCPLS model that retains only the information needed for prediction. This
+type is used mainly for efficient internal prediction during cross-validation.
+"""
+struct NCPLSFitLight{TB, TXStat, TYStat} <: AbstractNCPLSFit
+    B::TB
+    X_mean::TXStat
+    X_std::TXStat
+    Yprim_mean::TYStat
+end
+
+function Base.show(io::IO, mf::NCPLSFitLight)
+    print(io, "NCPLSFitLight(",
+        "predictor_dims=", repr(size(mf.B)[1:end-2]),
+        ", responses=", size(mf.B, ndims(mf.B)),
+        ", components=", size(mf.B, ndims(mf.B) - 1),
+        ")")
+end
+
+function Base.show(io::IO, ::MIME"text/plain", mf::NCPLSFitLight)
+    println(io, "NCPLSFitLight")
+    println(io, "  predictor_dims: ", repr(size(mf.B)[1:end-2]))
+    println(io, "  responses: ", size(mf.B, ndims(mf.B)))
+    print(io, "  components: ", size(mf.B, ndims(mf.B) - 1))
+end
+
+"""
     coef(mf::AbstractNCPLSFit)
     coef(mf::AbstractNCPLSFit, ncomps::Integer)
 
@@ -442,14 +470,14 @@ function validate_ncomponents(mf::AbstractNCPLSFit, ncomps::Integer)
 end
 
 """
-    restore_response_scale(Y::AbstractArray{<:Real}, mf::NCPLSFit; add_mean::Bool)
+    restore_response_scale(Y::AbstractArray{<:Real}, mf::AbstractNCPLSFit; add_mean::Bool)
 
 Restore response values from the fitted model's centered response space, optionally
 adding the stored response mean.
 """
 function restore_response_scale(
     Y::AbstractArray{<:Real},
-    mf::NCPLSFit;
+    mf::AbstractNCPLSFit;
     add_mean::Bool
 )
     Y_restored = float64(Y)

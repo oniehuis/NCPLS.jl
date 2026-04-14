@@ -580,7 +580,12 @@ function nestedcv(
         )
         optimal_num_latent_variables[outer_fold_idx] = best_k
 
-        final_model = fit(with_n_components(spec, best_k), X_train, Y_train; fold_kwargs...)
+        final_model = fit_ncpls_light(
+            with_n_components(spec, best_k),
+            X_train,
+            Y_train;
+            fold_kwargs...,
+        )
         Y_pred = predict_fn(final_model, X_test, best_k)
         score = score_fn(Y_test, Y_pred)
         score isa Real || throw(ArgumentError("score_fn must return a Real"))
@@ -737,7 +742,12 @@ function outlierscan(
             sample_indices=train_indices,
         )
 
-        final_model = fit(with_n_components(spec, best_k), X_train, Y_train; fold_kwargs...)
+        final_model = fit_ncpls_light(
+            with_n_components(spec, best_k),
+            X_train,
+            Y_train;
+            fold_kwargs...,
+        )
         Y_pred = cb.predict_fn(final_model, X_test, best_k)
         flags = cb.flag_fn(Y_test, Y_pred)
         length(flags) == length(test_indices) || throw(DimensionMismatch(
@@ -818,7 +828,12 @@ function optimize_num_latent_variables(
         )
         fold_kwargs = ensure_response_labels(fold_kwargs, Y_train)
 
-        model = fit(with_n_components(spec, max_components), X_train, Y_train; fold_kwargs...)
+        model = fit_ncpls_light(
+            with_n_components(spec, max_components),
+            X_train,
+            Y_train;
+            fold_kwargs...,
+        )
         scores = Vector{Float64}(undef, max_components)
         for k in 1:max_components
             score = score_fn(Y_validation, predict_fn(model, X_validation, k))

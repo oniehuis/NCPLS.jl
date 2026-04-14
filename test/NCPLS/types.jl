@@ -80,6 +80,15 @@ function mock_matrix_fit_with_metadata()
     )
 end
 
+function mock_light_fit()
+    NCPLS.NCPLSFitLight(
+        reshape(collect(1.0:4.0), 2, 2, 1),
+        [1.0, 2.0],
+        [2.0, 4.0],
+        [10.0],
+    )
+end
+
 @testset "NCPLSModel constructor and fields" begin
     model = NCPLS.NCPLSModel()
     @test model.ncomponents == 2
@@ -195,6 +204,17 @@ end
     @test metadata_mf.predictoraxes[1].unit == "min"
 end
 
+@testset "NCPLSFitLight stores prediction essentials" begin
+    mf = mock_light_fit()
+
+    @test mf isa NCPLS.AbstractNCPLSFit
+    @test mf isa NCPLS.NCPLSFitLight
+    @test size(mf.B) == (2, 2, 1)
+    @test mf.X_mean == [1.0, 2.0]
+    @test mf.X_std == [2.0, 4.0]
+    @test mf.Yprim_mean == [10.0]
+end
+
 @testset "NCPLSFit show methods" begin
     mf = mock_matrix_fit()
 
@@ -211,6 +231,20 @@ NCPLSFit
   multilinear: false"""
 end
 
+@testset "NCPLSFitLight show methods" begin
+    mf = mock_light_fit()
+
+    compact = sprint(show, mf)
+    @test compact == "NCPLSFitLight(predictor_dims=(2,), responses=1, components=2)"
+
+    plain = sprint(show, MIME"text/plain"(), mf)
+    @test plain == """
+NCPLSFitLight
+  predictor_dims: (2,)
+  responses: 1
+  components: 2"""
+end
+
 @testset "NCPLSFit helper methods" begin
     mf = mock_matrix_fit()
 
@@ -221,6 +255,22 @@ end
     @test_throws DimensionMismatch NCPLS.validate_ncomponents(mf, 3)
 
     Y = [1.0 2.0; 3.0 4.0]
+    @test NCPLS.restore_response_scale(Y, mf; add_mean = true) ≈
+        Y .+ reshape(mf.Yprim_mean, 1, :)
+    @test NCPLS.restore_response_scale(Y, mf; add_mean = false) ≈
+        Y
+end
+
+@testset "NCPLSFitLight helper methods" begin
+    mf = mock_light_fit()
+
+    @test NCPLS.ncomponents(mf) == 2
+    @test NCPLS.validate_ncomponents(mf, 1) == 1
+    @test NCPLS.validate_ncomponents(mf, 2) == 2
+    @test_throws DimensionMismatch NCPLS.validate_ncomponents(mf, 0)
+    @test_throws DimensionMismatch NCPLS.validate_ncomponents(mf, 3)
+
+    Y = reshape([1.0, 2.0], :, 1)
     @test NCPLS.restore_response_scale(Y, mf; add_mean = true) ≈
         Y .+ reshape(mf.Yprim_mean, 1, :)
     @test NCPLS.restore_response_scale(Y, mf; add_mean = false) ≈
@@ -247,4 +297,14 @@ end
     @test_throws ArgumentError NCPLS.xscores(mf, 3)
     @test_throws ArgumentError NCPLS.xscores(mf, 0:1)
     @test_throws ArgumentError NCPLS.xscores(mf, [1, 3])
+end
+
+@testset "NCPLSFitLight getters" begin
+    mf = mock_light_fit()
+
+    @test NCPLS.coef(mf) == selectdim(mf.B, ndims(mf.B) - 1, 2)
+    @test NCPLS.coef(mf, 1) == selectdim(mf.B, ndims(mf.B) - 1, 1)
+    @test NCPLS.xmean(mf) === mf.X_mean
+    @test NCPLS.xstd(mf) === mf.X_std
+    @test NCPLS.ymean(mf) === mf.Yprim_mean
 end

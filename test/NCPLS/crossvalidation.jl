@@ -155,7 +155,11 @@ end
     @test reg.score_fn(reshape([1.0, 2.0], :, 1), reshape([1.0, 3.0], :, 1)) ≈ sqrt(0.5)
     @test reg.select_fn([0.3, 0.2]) == 2
 
-    mf = NCPLS.fit(crossval_spec(multilinear = false), CROSSVAL_X_MATRIX, CROSSVAL_Y_REG)
+    mf = NCPLS.fit_ncpls_light(
+        crossval_spec(multilinear = false),
+        CROSSVAL_X_MATRIX,
+        CROSSVAL_Y_REG,
+    )
     @test reg.predict_fn(mf, CROSSVAL_X_MATRIX[1:3, :], 1) ≈ NCPLS.predict(
         mf,
         CROSSVAL_X_MATRIX[1:3, :],
