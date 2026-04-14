@@ -2,7 +2,7 @@
     fit(
         m::NCPLSModel,
         X::AbstractArray{<:Real},
-        Yprim::AbstractMatrix{<:Real};
+        Yprim;
         Yadd::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
         obs_weights::Union{AbstractVector{<:Real}, Nothing}=nothing,
         samplelabels::AbstractVector=String[],
@@ -15,28 +15,32 @@
 Fit a NCPLS model using the StatsAPI entry point and an explicit NCPLSModel. The model
 specification supplies the number of components, centering and scaling, whether the 
 multilinear loading-weight branch is used, whether mode weights are orthogonalized on 
-previous components, the analysis mode, and and the PARAFAC control settings
+previous components, the analysis mode, and the PARAFAC control settings
 `multilinear_maxiter`, `multilinear_tol`, `multilinear_init`, and `multilinear_seed`, while 
 the call to `fit` supplies data, optional weights, additional responses, and label metadata.
 
-When `Yprim` is provided, it is treated as the primary response block. When
-`sampleclasses` is provided, the labels are converted to a one-hot response matrix,
-class names are inferred as response labels, and the fit is forced to discriminant
-analysis; `m.analysis_mode` must be `:discriminant` or an ArgumentError is thrown.
+The interpretation of the third argument `Yprim` depends on its type. When `Yprim` is an
+`AbstractMatrix{<:Real}`, it is treated as a user-supplied response block and used as-is;
+it may contain arbitrary combinations of continuous responses, one-hot encoded class
+indicators, or other custom encodings. When `Yprim` is an `AbstractVector{<:Real}`, it is
+interpreted as a univariate numeric response and internally reshaped to a one-column
+matrix, corresponding to regression-style fitting. When `Yprim` is an
+`AbstractCategoricalArray`, it is interpreted as a vector of class labels; the labels are
+converted internally to a one-hot encoded response matrix, class names are inferred as
+response labels, and the fit is performed in discriminant mode. In this case,
+`m.analysis_mode` must be `:discriminant`, otherwise an `ArgumentError` is thrown.
 
-Optional `samplelabels`,
-`responselabels`, `sampleclasses`, and `predictoraxes` metadata are stored on the fitted
-object for downstream plotting and interpretation. If `verbose=true`, iteration progress
-from the PARAFAC step is printed when `m.multilinear` is enabled.
+Keyword arguments accepted by `fit` include `obs_weights` for per-sample weighting and
+`Yadd` for additional response columns. `Yadd` must have the same number of rows as `X`
+and is concatenated internally to `Yprim` to build the supervised projection, while
+prediction targets always remain the primary responses.
 
-
-Keyword arguments accepted by `fit` include `obs_weights` for per-sample weighting,
-`Yadd` for additional response columns, and optional `samplelabels`,
-`responselabels`, `sampleclasses`, and `predictoraxes` metadata are stored on the fitted
-object for downstream plotting and interpretation. If `verbose=true`, iteration progress
-from the PARAFAC step is printed when `m.multilinear` is enabled. `Yadd` must have the same 
-number of rows as `X` and is concatenated to `Yprim` internally to build the supervised 
-projection, while prediction targets always remain the primary responses.
+Optional `samplelabels`, `responselabels`, `sampleclasses`, and `predictoraxes` are stored
+on the fitted object for downstream plotting and interpretation. When `Yprim` is a numeric
+matrix or vector, `sampleclasses` is treated as metadata only and does not affect the
+fitted model. When class labels are passed positionally as a categorical array, they
+define the supervised response and are also stored as metadata. If `verbose=true`,
+iteration progress from the PARAFAC step is printed when `m.multilinear` is enabled.
 
 The return value is a `NCPLSFit` containing scores, loadings, regression coefficients,
 and the metadata needed for downstream prediction and diagnostics. Use `NCPLS.fit` or
@@ -54,20 +58,135 @@ end
 function fit(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
-    sampleclasses::AbstractCategoricalArray{T,1,R,V,C,U};
+    Yprim::AbstractVector{<:Real};
     kwargs...
-) where {T,R,V,C,U}
-
-    fit_ncpls(m, X, sampleclasses; kwargs...)
+)
+    fit_ncpls(m, X, Yprim; kwargs...)
 end
 
 function fit(
     m::NCPLSModel,
     X::AbstractArray{<:Real},
-    sampleclasses::AbstractVector;
+    Yprim::AbstractCategoricalArray{T,1,R,V,C,U};
     kwargs...
-)
-    fit_ncpls(m, X, sampleclasses; kwargs...)
+) where {T,R,V,C,U}
+
+    fit_ncpls(m, X, Yprim; kwargs...)
+end
+
+
+function fit_ncpls(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    Yprim::AbstractMatrix{<:Real};
+    Yadd::T1=nothing,
+    obs_weights::T2=nothing,
+    samplelabels::T3=String[],
+    responselabels::T4=String[],
+    sampleclasses::T5=nothing,
+    predictoraxes=(),
+    verbose::Bool=false
+) where {
+    T1<:Union{LinearAlgebra.AbstractVecOrMat{<:Real}, Nothing},
+    T2<:Union{AbstractVector{<:Real}, Nothing},
+    T3<:AbstractVector,
+    T4<:AbstractVector,
+    T5<:Union{AbstractVector, Nothing}
+}
+
+    fit_ncpls_core(m, X, Yprim;
+        Yadd=Yadd, 
+        obs_weights=obs_weights, 
+        samplelabels=samplelabels,
+        responselabels=responselabels,
+        sampleclasses=sampleclasses,
+        predictoraxes=predictoraxes, 
+        verbose=verbose
+    )
+end
+
+function fit_ncpls(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    Yprim::AbstractVector{<:Real};
+    Yadd::T1=nothing,
+    obs_weights::T2=nothing,
+    samplelabels::T3=String[],
+    responselabels::T4=String[],
+    sampleclasses::T5=nothing,
+    predictoraxes=(),
+    verbose::Bool=false
+) where {
+    T1<:Union{LinearAlgebra.AbstractVecOrMat, Nothing},
+    T2<:Union{AbstractVector{<:Real}, Nothing},
+    T3<:AbstractVector,
+    T4<:AbstractVector,
+    T5<:Union{AbstractVector, Nothing}
+}
+
+    if m.analysis_mode ≡ :discriminant
+        throw(ArgumentError(
+            "`Yprim::AbstractVector{<:Real}` is interpreted as a univariate numeric " * 
+            "response and is not valid for `analysis_mode=:discriminant`. " *
+            "Pass class labels as an `AbstractCategoricalArray`, or pass an explicitly " * 
+            "encoded response matrix."
+        ))
+    end
+
+    isnothing(sampleclasses) || throw(ArgumentError(
+        "`sampleclasses` cannot be provided when `Yprim` is a numeric vector. " *
+        "Use an `AbstractCategoricalArray` as the third argument for discriminant " * 
+        "analysis instead."
+    ))
+
+    Yprim_matrix = reshape(Yprim, :, 1)
+
+    fit_ncpls_core(m, X, Yprim_matrix;
+        Yadd=Yadd, 
+        obs_weights=obs_weights, 
+        samplelabels=samplelabels,
+        responselabels=responselabels,
+        sampleclasses=sampleclasses,
+        predictoraxes=predictoraxes, 
+        verbose=verbose
+    )
+end
+
+function fit_ncpls(
+    m::NCPLSModel,
+    X::AbstractArray{<:Real},
+    sampleclasses::AbstractCategoricalArray{T,1,R,V,C,U};
+    Yadd::T1=nothing,
+    obs_weights::T2=nothing,
+    samplelabels::T3=String[],
+    responselabels::T4=String[],
+    predictoraxes=(),
+    verbose::Bool=false
+) where {
+    T, R, V, C, U,
+    T1<:Union{LinearAlgebra.AbstractVecOrMat{<:Real}, Nothing},
+    T2<:Union{AbstractVector{<:Real}, Nothing},
+    T3<:AbstractVector,
+    T4<:AbstractVector
+}
+    isempty(responselabels) || throw(ArgumentError("`responselabels` cannot be provided" *
+        " when passing sample classes; response labels are inferred automatically."))
+
+    m.analysis_mode ≡ :discriminant || throw(ArgumentError(
+        "NCPLSModel must use analysis_mode=:discriminant when passing class labels as " * 
+        "an `AbstractCategoricalArray`"))
+    
+    Yprim, classes = onehot(sampleclasses)
+
+    fit_ncpls_core(m, X, Yprim;
+        Yadd=Yadd, 
+        obs_weights=obs_weights, 
+        samplelabels=samplelabels,
+        responselabels=classes,
+        sampleclasses=copy(sampleclasses),
+        predictoraxes=predictoraxes, 
+        verbose=verbose
+    )
 end
 
 """
@@ -268,141 +387,6 @@ function fit_ncpls_core(
         responselabels = responselabels,
         sampleclasses = sampleclasses,
         predictoraxes = predictoraxes,
-    )
-end
-
-function fit_ncpls(
-    m::NCPLSModel,
-    X::AbstractArray{<:Real},
-    Yprim::AbstractMatrix{<:Real};
-    Yadd::T1=nothing,
-    obs_weights::T2=nothing,
-    samplelabels::T3=String[],
-    responselabels::T4=String[],
-    sampleclasses::T5=nothing,
-    predictoraxes=(),
-    verbose::Bool=false
-
-) where {
-    T1<:Union{LinearAlgebra.AbstractVecOrMat{<:Real}, Nothing},
-    T2<:Union{AbstractVector{<:Real}, Nothing},
-    T3<:AbstractVector,
-    T4<:AbstractVector,
-    T5<:Union{AbstractVector, Nothing}
-}
-
-    fit_ncpls_core(m, X, Yprim;
-        Yadd=Yadd, 
-        obs_weights=obs_weights, 
-        samplelabels=samplelabels,
-        responselabels=responselabels,
-        sampleclasses=sampleclasses,
-        predictoraxes=predictoraxes, 
-        verbose=verbose
-    )
-end
-
-function fit_ncpls(
-    m::NCPLSModel,
-    X::AbstractArray{<:Real},
-    Yprim::AbstractVector{<:Real};
-    Yadd::T1=nothing,
-    obs_weights::T2=nothing,
-    samplelabels::T3=String[],
-    responselabels::T4=String[],
-    sampleclasses::T5=nothing,
-    predictoraxes=(),
-    verbose::Bool=false
-) where {
-    T1<:Union{LinearAlgebra.AbstractVecOrMat, Nothing},
-    T2<:Union{AbstractVector{<:Real}, Nothing},
-    T3<:AbstractVector,
-    T4<:AbstractVector,
-    T5<:Union{AbstractVector, Nothing}
-}
-    Yprim_matrix = reshape(Yprim, :, 1)
-
-    # Hier wurde analysis_mode=:regression an fit_cppls_core übergeben. Relevant?
-
-    fit_ncpls_core(m, X, Yprim_matrix;
-        Yadd=Yadd, 
-        obs_weights=obs_weights, 
-        samplelabels=samplelabels,
-        responselabels=responselabels,
-        sampleclasses=sampleclasses,
-        predictoraxes=predictoraxes, 
-        verbose=verbose
-    )
-end
-
-
-function fit_ncpls(
-    m::NCPLSModel,
-    X::AbstractArray{<:Real},
-    sampleclasses::AbstractCategoricalArray{T,1,R,V,C,U};
-    kwargs...
-) where {T,R,V,C,U}
-
-    m.analysis_mode ≡ :discriminant || throw(ArgumentError(
-        "NCPLSModel must use analysis_mode=:discriminant when fitting from sampleclasses."))
-    
-    fit_ncpls_from_sample_classes(m, X, sampleclasses; kwargs...)
-end
-
-function fit_ncpls(
-    m::NCPLSModel,
-    X::AbstractArray{<:Real},
-    sampleclasses::AbstractVector;
-    kwargs...
-)
-    m.analysis_mode ≡ :discriminant || throw(ArgumentError(
-        "NCPLSModel must use analysis_mode=:discriminant when fitting from sampleclasses."))
-    
-    fit_ncpls_from_sample_classes(m, X, sampleclasses; kwargs...)
-end
-
-"""
-    fit_ncpls_from_sample_classes(
-        m::NCPLSModel,
-        X::AbstractArray{<:Real},
-        sampleclasses,
-        ncomponents::Int=2;
-        kwargs...
-    )
-
-Internal helper that converts class labels to a one-hot response matrix before fitting
-and is primarily used by the label-based `fit_cppls` wrappers. Prefer `fit` for user
-documentation and public entry points.
-"""
-function fit_ncpls_from_sample_classes(
-    m::NCPLSModel,
-    X::AbstractArray{<:Real},
-    sampleclasses;
-    Yadd::T1=nothing,
-    obs_weights::T2=nothing,
-    samplelabels::T3=String[],
-    responselabels::T4=String[],
-    predictoraxes=(),
-    verbose::Bool=false
-) where {
-    T1<:Union{LinearAlgebra.AbstractVecOrMat, Nothing},
-    T2<:Union{AbstractVector{<:Real}, Nothing},
-    T3<:AbstractVector,
-    T4<:AbstractVector
-}
-    isempty(responselabels) || throw(ArgumentError("`responselabels` cannot be provided" *
-        " when passing sample classes; response labels are inferred automatically."))
-
-    Yprim, classes = onehot(sampleclasses)
-
-    fit_ncpls_core(m, X, Yprim;
-        Yadd=Yadd, 
-        obs_weights=obs_weights, 
-        samplelabels=samplelabels,
-        responselabels=classes,
-        sampleclasses=copy(sampleclasses),
-        predictoraxes=predictoraxes, 
-        verbose=verbose
     )
 end
 
