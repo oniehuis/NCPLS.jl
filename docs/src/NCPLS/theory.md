@@ -53,13 +53,13 @@ as time, ions, wavelength, image rows, or image columns. Let
 $Y_{\mathrm{prim}} \in \mathbb{R}^{n \times q}$ denote the primary responses to be 
 predicted, and optionally let $Y_{\mathrm{add}} \in \mathbb{R}^{n \times r}$ denote 
 additional responses that are available during training and should influence the extracted 
-latent structure without necessarily being prediction targets.
+latent structure without being prediction targets.
 
 As in CPLS, N-CPLS first constructs a supervised intermediate representation from 
-$\mathcal{X}$ and the combined response block $[Y_{\mathrm{prim}} ;; Y_{\mathrm{add}}]$. 
+$\mathcal{X}$ and the combined response block $[Y_{\mathrm{prim}} \;\; Y_{\mathrm{add}}]$. 
 This is done by computing response-specific directions in predictor space via contraction 
 of $\mathcal{X}$ with the response block along the sample mode. In the matrix case, this 
-corresponds to forming $W_0 = X^\top [Y_{\mathrm{prim}} ;; Y_{\mathrm{add}}],$ where each 
+corresponds to forming $W_0 = X^\top [Y_{\mathrm{prim}} \;\; Y_{\mathrm{add}}],$ where each 
 column of $W_0$ represents a predictor direction associated with one response variable.
 
 The predictor data are then projected onto these response-specific directions, yielding a 
@@ -76,27 +76,38 @@ candidate components should be linearly combined to maximise their correlation w
 primary responses.
 
 The final predictor-side loading weights are then obtained by mapping this combination back 
-to the predictor space as $\mathcal{W} = \mathcal{W}0 \times c,$ which collapses the 
+to the predictor space as $\mathcal{W} = \mathcal{W}_0 \times c,$ which collapses the 
 response dimension by forming a weighted combination of the response-specific directions. 
-In the multilinear formulation of N-CPLS,this weight tensor is subsequently approximated by 
-an outer product of mode-specific vectors, 
-$\mathcal{W}\circ = w^{(1)} \circ \cdots \circ w^{(d)},$ yielding a separable 
-representation of the component. Importantly, subsequent computations are not performed on 
-the individual mode-specific vectors $w^{(1)}, \dots, w^{(d)}$, but on the combined loading 
-weight tensor $\mathcal{W}\circ$. 
+
+In the multilinear formulation of N-CPLS, this weight tensor is subsequently approximated 
+by an outer product of mode-specific vectors, 
+$\mathcal{W}_0 ≈ w^{(1)} \circ \cdots \circ w^{(d)} = \mathcal{W}\circ,$ yielding a 
+separable representation of the component. Importantly, subsequent computations are not 
+performed on the individual mode-specific vectors $w^{(1)}, \dots, w^{(d)}$, but on the 
+combined loading weight tensor $\mathcal{W}\circ$ (≠ $\mathcal{W}_0$). 
 
 The component score vector is obtained by projecting the predictor tensor onto this tensor, 
 $t = \mathcal{X} ,\circledast_d, \mathcal{W}\circ,$ where the contraction is taken over all 
 predictor modes, resulting in a score vector $t \in \mathbb{R}^n$. The predictor loadings 
 are computed as $\mathcal{P} = \mathcal{X}^\top t / (t^\top t),$ and the response loadings 
-for the primary responses as $q = Y_{\mathrm{prim}}^\top t / (t^\top t).$
+for the primary responses as $q = Y_{\mathrm{prim}}^\top t / (t^\top t).$ The operator 
+$\circledast_d$ denotes tensor contraction over the $d$ predictor modes. For a predictor 
+tensor $\mathcal{X} \in \mathbb{R}^{n \times p_1 \times \cdots \times p_d}$ and a weight 
+tensor $\mathcal{W} \in \mathbb{R}^{p_1 \times \cdots \times p_d}$, the product
+$t = \mathcal{X} ,\circledast_d, \mathcal{W}$ yields a vector $t \in \mathbb{R}^n$, where 
+each element is given by 
+$t_i = \sum_{j_1,\dots,j_d} \mathcal{X}{i,j_1,\dots,j_d},\mathcal{W}{j_1,\dots,j_d}$.
+This corresponds to a multilinear projection of each sample onto the loading weight tensor.
 
 To ensure that subsequent components capture new information, N-CPLS employs 
 orthogonalisation in a conditional manner. When additional responses are included, the 
 candidate score matrix $Z_0$ is orthogonalised with respect to previously extracted score 
-vectors before the canonical correlation step. This prevents information introduced 
-through $Y_{\mathrm{add}}$ from being repeatedly captured across components. When no 
-additional responses are used, this orthogonalisation step is omitted.
+vectors before the canonical correlation step. This prevents information introduced through 
+$Y_{\mathrm{add}}$ from being repeatedly captured across components. Specifically, if 
+$T_{1:a-1} \in \mathbb{R}^{n \times (a-1)}$ denotes the matrix of previously extracted 
+score vectors, the orthogonalised candidate scores are obtained as
+$Z_0 \leftarrow Z_0 - T_{1:a-1}(T_{1:a-1}^\top T_{1:a-1})^{-1} T_{1:a-1}^\top Z_0$.
+When no additional responses are used, this orthogonalisation step is omitted.
 
 In the multilinear formulation, an additional optional orthogonalisation can be applied to 
 the mode-specific weight vectors $w^{(j)}$ across components. For each mode $j$ and 
@@ -104,15 +115,12 @@ component $a$, this corresponds to removing the projection of $w^{(j)}a$ onto th
 spanned by the previously estimated mode-$j$ weight vectors, 
 $w^{(j)}a \leftarrow w^{(j)}a - W^{(j)}{1:a-1}(W^{(j)\top}{1:a-1} W^{(j)}{1:a-1})^{-1} W^{(j)\top}_{1:a-1} w^{(j)}_a$, 
 followed by normalisation. This enforces orthogonality of the loading vectors within each 
-mode.
-
-Because the multilinear loading tensor is formed as an outer product, 
+mode. Because the multilinear loading tensor is formed as an outer product, 
 $\mathcal{W}_{\circ,a} = w^{(1)}_a \circ \cdots \circ w^{(d)}_a$, orthogonalising each 
 $w^{(j)}_a$ implies that the resulting component loading tensors become orthogonal in the 
 unfolded predictor space. This yields loading vectors per mode that are directly 
-comparable across components, which simplifies interpretation and visualisation.
-
-However, this step imposes an additional constraint on the solution: each new component is 
+comparable across components, which simplifies interpretation and visualisation. However, 
+this step imposes an additional constraint on the solution: each new component is 
 restricted to be orthogonal to previous ones within every mode separately, not only in the 
 combined predictor space. As a result, the admissible set of loading tensors is reduced, 
 which can prevent the model from capturing directions that would otherwise improve fit or 
@@ -120,10 +128,24 @@ prediction. Consequently, while this orthogonalisation can enhance interpretabil
 also reduce predictive performance when the true structure is not well aligned with these 
 per-mode orthogonality constraints.
 
-After the score vector $t$ has been computed, the algorithm proceeds with response 
-deflation. Unlike classical N-PLS, N-CPLS avoids repeated deflation of the full predictor 
-tensor and instead relies on orthogonalisation and response deflation to ensure that 
-subsequent components capture new variation.
+After the score vector $t$ has been computed, the algorithm proceeds with deflation of the 
+response matrix. In contrast to classical N-PLS, the predictor tensor $\mathcal{X}$ is not 
+deflated. Instead, only the response block is updated, while $\mathcal{X}$ remains 
+unchanged throughout the algorithm.
+
+The response loadings are computed as $q = Y_{\mathrm{prim}}^\top t / (t^\top t),$ and the 
+primary response matrix is then deflated as 
+$Y_{\mathrm{prim}} \leftarrow Y_{\mathrm{prim}} - t q^\top.$ If additional responses are 
+included in the model, they are part of the combined response block used in the 
+construction of $W_0$ and $Z_0$, but the deflation step is applied to the response matrix 
+used for prediction. This ensures that subsequent components capture variation in the 
+responses that has not yet been explained by previously extracted components.
+
+Because the predictor tensor is not deflated, the extraction of subsequent components 
+relies on the updated response matrix and, when applicable, on orthogonalisation of the 
+candidate score matrix $Z_0$. This avoids repeated manipulation of the high-dimensional 
+predictor data while maintaining the sequential extraction of response-relevant latent 
+components.
 
 The algorithm then repeats the same sequence of steps—construction of candidate directions, 
 canonical combination, multilinear approximation, and score computation—until the desired 
