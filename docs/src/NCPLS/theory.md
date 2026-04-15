@@ -1,2 +1,24 @@
 # Theory
 
+N-way Canonical Partial Least Squares (N-CPLS) is a supervised latent-variable method for regression and classification tailored to multiway (tensor-valued) predictor data. It 
+extends the canonical partial least squares (CPLS) framework to predictors with more than 
+two modes, enabling direct modelling of multidimensional arrays rather than requiring prior unfolding. The aim of N-CPLS is to extract latent components that summarise the predictor 
+tensor \mathcal{X}\in\mathbb{R}^{n\times p_1\times\cdots\times p_d}, where n is the number 
+of samples and p_1,\ldots,p_d are the sizes of the variable modes, such that these 
+components are maximally informative with respect to a multivariate response matrix 
+Y\in\mathbb{R}^{n\times q}. As in CPLS, the extraction of components is guided by a correlation-based criterion obtained via canonical correlation analysis (CCA), rather than 
+the covariance maximisation used in classical PLS. This makes N-CPLS applicable to both 
+regression and classification problems within a unified framework.
+
+A key distinction from classical (two-way) CPLS is how the predictor weights are 
+parameterised. In the multilinear formulation of N-CPLS, the weight structure is 
+constrained to reflect the multiway nature of the data. Instead of estimating a single unconstrained weight vector over all predictor variables, the method estimates a set of mode-specific weight vectors w^{\left(1\right)},\ldots,w^{\left(d\right)}, one for each 
+predictor dimension. The overall loading weight tensor is then constructed as their outer 
+product, \mathcal{W}=w^{\left(1\right)}\circ\cdots\circ w^{\left(d\right)}.
+
+This multilinear constraint substantially reduces the number of free parameters—from the 
+product of all mode dimensions to their sum—yielding a more parsimonious model. While this restriction may limit flexibility compared to an unfolded approach, it enables the 
+decomposition of the loading weights into mode-specific vectors. This allows direct 
+inspection of variable contributions within each mode (e.g., temporal and spectral 
+dimensions), facilitating interpretation of how each dimension contributes to the extracted components. Moreover, this reduced parametrisation acts as an implicit regularisation, 
+which can improve generalisation and reduce sensitivity to overfitting, provided that the multilinear assumption is reasonably satisfied.
