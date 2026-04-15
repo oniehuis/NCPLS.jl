@@ -5,6 +5,7 @@ regression and classification tailored to multiway (tensor-valued) predictor dat
 extends the canonical partial least squares (CPLS) framework to predictors with more than
 two modes, enabling direct modelling of multidimensional arrays rather than requiring prior
 unfolding.
+
 The aim of N-CPLS is to extract latent components that summarise the predictor tensor
 $\mathcal{X} \in \mathbb{R}^{n \times p_1 \times \cdots \times p_d}$, where $n$ is the
 number of samples and $p_1, \dots, p_d$ are the sizes of the variable modes, such that
@@ -13,6 +14,7 @@ $Y \in \mathbb{R}^{n \times q}$. As in CPLS, the extraction of components is gui
 by a correlation-based criterion obtained via canonical correlation analysis (CCA), rather
 than the covariance maximisation used in classical PLS. This makes N-CPLS applicable to
 both regression and classification problems within a unified framework.
+
 In addition to modelling one or more primary responses, N-CPLS allows the inclusion of
 auxiliary response variables that are used during component extraction but are not
 necessarily targets for prediction. These additional responses can guide the estimation
@@ -22,6 +24,7 @@ well suited for settings where the number of predictors greatly exceeds the numb
 samples ($p \gg n$) and where strong collinearity is present among predictors. By
 projecting the data onto a low-dimensional latent space, the method mitigates issues
 related to high dimensionality and multicollinearity.
+
 A key distinction from classical CPLS is how the predictor weights are parameterised. In
 the multilinear formulation of N-CPLS, the weight structure is constrained to reflect the
 multiway nature of the data. Instead of estimating a single unconstrained weight vector
@@ -29,6 +32,7 @@ over all predictor variables, the method estimates a set of mode-specific weight
 $w^{(1)}, \dots, w^{(d)}$, one for each predictor dimension. The overall loading weight
 tensor is then constructed as their outer product,
 $\mathcal{W} = w^{(1)} \circ \cdots \circ w^{(d)}$.
+
 This multilinear constraint substantially reduces the number of free parameters—from the
 product of all mode dimensions to their sum—yielding a more parsimonious model. While this
 restriction may limit flexibility compared to an unfolded approach, it arises from
