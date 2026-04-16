@@ -239,6 +239,120 @@ nothing # hide
 
 ![](fit_reg_multilinear_vs_unfolded.svg)
 
+### NCPLS-Specific Predictor Surfaces
+
+The score plots above summarize how samples are arranged in latent space, but NCPLS also
+stores model objects that still live on the predictor axes themselves. For a genuinely
+two-mode predictor such as this synthetic RT-by-m/z example, two fitted-model views are
+especially helpful:
+
+- `weightlandscape(mf; lv=k)` shows the component-specific predictor-side weight surface,
+- `coefficientlandscape(mf; response=j)` shows the final cumulative regression surface
+  for one response.
+
+The first tells us which predictor regions drive a latent component. The second tells us
+how the final fitted model maps the predictor surface to one chosen response variable.
+
+```@example fit_examples
+rt_axis, mz_axis = predictoraxes(mf_reg)
+
+W_lv1 = weightlandscape(mf_reg; lv=1)
+W_lv2 = weightlandscape(mf_reg; lv=2)
+B_trait1 = coefficientlandscape(mf_reg; response=1)
+B_trait2 = coefficientlandscape(mf_reg; response=2)
+
+weight_lim = maximum(abs.(vcat(vec(W_lv1), vec(W_lv2))))
+coef_lim = maximum(abs.(vcat(vec(B_trait1), vec(B_trait2))))
+
+fig_landscapes = Figure(size=(1300, 850))
+
+ax_w1 = Axis(
+    fig_landscapes[1, 1],
+    title="LV1 weight landscape",
+    xlabel=rt_axis.name,
+    ylabel=mz_axis.name,
+)
+heatmap!(
+    ax_w1,
+    rt_axis.values,
+    mz_axis.values,
+    W_lv1;
+    colormap=:RdBu,
+    colorrange=(-weight_lim, weight_lim),
+)
+
+ax_w2 = Axis(
+    fig_landscapes[1, 2],
+    title="LV2 weight landscape",
+    xlabel=rt_axis.name,
+    ylabel=mz_axis.name,
+)
+heatmap!(
+    ax_w2,
+    rt_axis.values,
+    mz_axis.values,
+    W_lv2;
+    colormap=:RdBu,
+    colorrange=(-weight_lim, weight_lim),
+)
+
+ax_b1 = Axis(
+    fig_landscapes[2, 1],
+    title="$(data.responselabels_reg[1]) coefficient landscape",
+    xlabel=rt_axis.name,
+    ylabel=mz_axis.name,
+)
+heatmap!(
+    ax_b1,
+    rt_axis.values,
+    mz_axis.values,
+    B_trait1;
+    colormap=:RdBu,
+    colorrange=(-coef_lim, coef_lim),
+)
+
+ax_b2 = Axis(
+    fig_landscapes[2, 2],
+    title="$(data.responselabels_reg[2]) coefficient landscape",
+    xlabel=rt_axis.name,
+    ylabel=mz_axis.name,
+)
+heatmap!(
+    ax_b2,
+    rt_axis.values,
+    mz_axis.values,
+    B_trait2;
+    colormap=:RdBu,
+    colorrange=(-coef_lim, coef_lim),
+)
+
+Colorbar(
+    fig_landscapes[1, 3],
+    limits=(-weight_lim, weight_lim),
+    colormap=:RdBu,
+    label="Weight",
+)
+
+Colorbar(
+    fig_landscapes[2, 3],
+    limits=(-coef_lim, coef_lim),
+    colormap=:RdBu,
+    label="Coefficient",
+)
+
+save("fit_predictor_surfaces.svg", fig_landscapes)
+nothing # hide
+```
+
+![](fit_predictor_surfaces.svg)
+
+This figure helps separate two ideas that are easy to conflate. The weight landscapes in
+the top row are component objects: they show which RT-by-m/z regions define LV1 and LV2.
+The coefficient landscapes in the bottom row are response objects: they show how the
+final fitted model predicts each trait from the predictor surface. Because latent-variable
+signs are arbitrary, the signed colors in the top row should be read mainly as a pattern
+of contrasting regions rather than as absolute "positive" or "negative" chemistry.
+
 ### Switching Between Unfolded and Multilinear Fits
 
 The response handling is unchanged; only the predictor-side representation differs.
