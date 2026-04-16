@@ -7,9 +7,10 @@ After fitting an NCPLS model with [`fit`](@ref), you can apply it in two main wa
 - Use [`predict`](@ref) to generate predicted responses from new predictor arrays.
 
 `project(mf, Xnew)` returns a matrix with one row per new sample and one column per latent
-component. `predict(mf, Xnew, A)` returns a numeric array of size
-`(n_samples, A, n_responses)`, where slice `[:, a, :]` is the cumulative prediction based
-on the first `a` components. This means that even `predict(mf, Xnew, 1)` returns a
+component. In `predict(mf, Xnew, A)`, `A::Integer` is the requested number of latent
+components to use, with `1 ≤ A ≤ ncomponents(mf)`. The return value is a numeric array of
+size `(n_samples, A, n_responses)`, where slice `[:, a, :]` is the cumulative prediction
+based on the first `a` components. This means that even `predict(mf, Xnew, 1)` returns a
 three-dimensional array with one component slice rather than a plain matrix.
 
 For classification-capable fits, NCPLS provides two decoding layers on top of `predict`:
@@ -18,10 +19,6 @@ For classification-capable fits, NCPLS provides two decoding layers on top of `p
   component slice to a one-hot class matrix.
 - `predictclasses(mf, Xnew, A)` or `predictclasses(mf, predictions)` maps those class
   scores back to class labels.
-
-Compared with the matrix-valued CPPLS workflow, the practical role of
-`sampleclasses(mf, Xnew)` is handled here by `predictclasses`, because NCPLS keeps the
-sample-level `sampleclasses` name for fitted-model metadata and one-hot decoding helpers.
 
 For mixed response blocks such as `[class indicators | continuous traits]`, `predict`
 still returns the full numeric response block, while `onehot` and `predictclasses`
@@ -152,12 +149,14 @@ for a discriminant fit it is a tensor of class scores, not a vector of labels.
 ```@example predict_examples
 Yhat_da = predict(mf_da, X_holdout, 2)
 predicted_da = predictclasses(mf_da, Yhat_da)
-
-(;
-    tensor_size=size(Yhat_da),
-    final_class_scores=round.(Yhat_da[1:4, end, :]; digits=3),
-)
+tensor_size=size(Yhat_da)
 ```
+
+
+```@example predict_examples
+final_class_scores=round.(Yhat_da[1:4, end, :]; digits=3)
+```
+
 
 ```@example predict_examples
 hcat(labels_holdout, classes_holdout, predicted_da)
@@ -189,11 +188,11 @@ holdout_reg = @view Yhat_reg[:, end, :]
 trait_correlations = [
     cor(holdout_reg[:, j], data.Yprim_reg[holdout_idx, j]) for j in axes(data.Yprim_reg, 2)
 ]
+tensor_size=size(Yhat_reg)
+```
 
-(;
-    tensor_size=size(Yhat_reg),
-    holdout_correlations=collect(zip(data.responselabels_reg, round.(trait_correlations; digits=3))),
-)
+```@example predict_examples
+holdout_correlations=collect(zip(data.responselabels_reg, round.(trait_correlations; digits=3)))
 ```
 
 ```@example predict_examples
