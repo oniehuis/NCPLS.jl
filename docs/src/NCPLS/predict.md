@@ -297,8 +297,13 @@ decode only the inferred class-response columns.
 ## API
 
 [`project`](@ref NCPLS.project)
+
 [`predict`](@ref StatsAPI.predict)
+
 [`onehot(mf, X, ncomps)`](@ref NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real}, ::Integer))
+
 [`onehot(mf, predictions)`](@ref NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3}))
+
 [`predictclasses(mf, X, ncomps)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real}, ::Integer))
-`predictclasses(mf, predictions)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3}))
+
+[`predictclasses(mf, predictions)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3}))
