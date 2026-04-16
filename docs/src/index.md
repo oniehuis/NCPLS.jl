@@ -45,7 +45,6 @@ workflows rely on the more general nested cross-validation functions with custom
 
 ```@example quickstart
 using NCPLS
-using CategoricalArrays
 using Statistics
 using CairoMakie
 

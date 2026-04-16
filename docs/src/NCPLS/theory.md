@@ -60,8 +60,7 @@ The first compression computes the candidate loading weights
 W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
-
-$W_{0,(1)}$ has $p$ rows and $m$ columns. After refolding, it becomes a tensor
+The matrix $W_{0,(1)}$ has $p$ rows and $m$ columns. After refolding, it becomes a tensor
 $W_0$ with shape $p_1 \times p_2 \times \cdots \times p_d \times m$, so there is one
 predictor-shaped slice for each response
 column.
@@ -132,10 +131,8 @@ Projecting $X$ onto the response-specific directions gives the candidate scores
 Z_0 = X_{(1)} W_{0,(1)}.
 ```
 
-
-$Z_0$ has one column per response column in $Y_{\mathrm{comb}}$. CCA is then run between
-$Z_0$ and the current primary-response matrix $Y$. The dominant left canonical weight
-vector tells us how to combine the columns of $Z_0$ so that the resulting linear
+The matrix $Z_0$ has one column per response column in $Y_{\mathrm{comb}}$. CCA is then run between $Z_0$ and the current primary-response matrix $Y$. The dominant left canonical 
+weight vector tells us how to combine the columns of $Z_0$ so that the resulting linear
 combination is maximally correlated with $Y$.
 
 ```math
@@ -343,28 +340,25 @@ cross-products and as square roots in the CCA row scaling.
 ## Additional Responses (`Yadd`)
 
 
-$Y_{\mathrm{add}}$ is for sample-level information that is available during fitting and is related to
-the same latent structure as $Y_{\mathrm{prim}}$, but is not itself a prediction target. A typical
-use case is a low-noise proxy measurement, metadata, or an auxiliary assay available only
-for the calibration samples.
+The auxiliary response block $Y_{\mathrm{add}}$ is for sample-level information that is available during fitting and is related to the same latent structure as 
+$Y_{\mathrm{prim}}$, but is not itself a prediction target. A typical use case is a 
+low-noise proxy measurement, metadata, or an auxiliary assay available only for the 
+calibration samples.
 
 When `Yadd` is present, the following code branches are activated.
 
-1. The fitting loop forms `Ycomb = hcat(Y, Yadd)`.
-2. `candidate_loading_weights` and `candidate_scores` use `Ycomb`, so the auxiliary
+1\. The fitting loop forms `Ycomb = hcat(Y, Yadd)`.
+2\. `candidate_loading_weights` and `candidate_scores` use `Ycomb`, so the auxiliary
    columns enlarge the supervised search space.
-3. The candidate-score orthogonalization step for $Z_0$ is turned on.
-4. CCA is still performed against the current deflated $Y$, not against `Ycomb`.
-5. The response loading $q$, the deflation step, the regression coefficients, and
+3\. The candidate-score orthogonalization step for $Z_0$ is turned on.
+4\. CCA is still performed against the current deflated $Y$, not against `Ycomb`.
+5\. The response loading $q$, the deflation step, the regression coefficients, and
    `predict` all use only `Yprim`.
-6. New samples do not need `Yadd`, because the fitted model stores only predictor-side
+6\. New samples do not need `Yadd`, because the fitted model stores only predictor-side
    objects and primary-response regression coefficients.
 
 
-$Y_{\mathrm{add}}$ can therefore make the first few components more parsimonious when
-$Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information exists. In this package, however, `Yadd` is not
-centered automatically. Under the default centered-`X` workflow, constant column offsets
-in `Yadd` usually do not change the latent directions because they vanish in the product
-$X_{(1)}^\top Y_{\mathrm{add}}$. If $X$ is not centered, or if you want a specific
-preprocessing convention for the auxiliary block, center `Yadd` manually before calling
-[`fit`](@ref).
+This means that $Y_{\mathrm{add}}$ can therefore make the first few components more parsimonious when $Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information exists. 
+In this package, however, `Yadd` is not centered automatically. Under the default 
+centered-`X` workflow, constant column offsets in `Yadd` usually do not change the latent directions because they vanish in the product $X_{(1)}^\top Y_{\mathrm{add}}$. If $X$ is 
+not centered, or if you want a specific preprocessing convention for the auxiliary block, center `Yadd` manually before calling [`fit`](@ref).
