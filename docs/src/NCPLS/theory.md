@@ -178,11 +178,9 @@ a rank-1 multilinear object
 W^\circ = w^{(1)} \circ w^{(2)} \circ \cdots \circ w^{(d)}.
 ```
 
-The exact approximation depends on the number of predictor modes.
-
-1. If `d = 1`, $W$ is just normalized.
-2. If `d = 2`, the leading rank-1 SVD approximation is used.
-3. If `d >= 3`, a one-component PARAFAC model is fitted.
+The exact approximation depends on the number of predictor modes: if $d = 1$, $W$ is
+just normalized; if $d = 2$, the leading rank-1 SVD approximation is used; and if
+$d \ge 3$, a one-component PARAFAC model is fitted.
 
 After this factorization, the package optionally orthogonalizes the mode vectors on
 previous mode vectors, normalizes them, and then recombines them into the outer-product
