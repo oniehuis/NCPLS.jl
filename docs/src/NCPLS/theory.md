@@ -97,16 +97,30 @@ If there is only one response column, there is only one such slice. After the la
 collapse by the canonical vector $c$, the result is simply one predictor-side
 vector/matrix/tensor for the current component.
 
-A useful shape diagram is
+A useful shape summary is
 
-```text
-X_(1):   n x p
-Y_comb:  n x m
-
-W0_(1) = X_(1)' Y_comb      -> p x m
-Z0     = X_(1)  W0_(1)      -> n x m
-CCA(Z0, Y) -> c             -> m x 1
-W_(1)  = W0_(1) c           -> p x 1
+```math
+\begin{aligned}
+X_{(1)} &\in \mathbb{R}^{n \times p},
+&
+Y_{\mathrm{comb}} &\in \mathbb{R}^{n \times m},
+\\
+W_{0,(1)} &= X_{(1)}^\top Y_{\mathrm{comb}}
+&
+&\in \mathbb{R}^{p \times m},
+\\
+Z_0 &= X_{(1)} W_{0,(1)}
+&
+&\in \mathbb{R}^{n \times m},
+\\
+c &= \text{dominant left canonical weight from } \mathrm{CCA}(Z_0, Y)
+&
+&\in \mathbb{R}^{m \times 1},
+\\
+W_{(1)} &= W_{0,(1)} c
+&
+&\in \mathbb{R}^{p \times 1}.
+\end{aligned}
 ```
 
 ### 2. Canonical combination
