@@ -267,6 +267,106 @@ The returned named tuple contains:
 - `rate`: the ratio `n_flagged ./ n_tested`.
 
 ```@example crossvalidation_examples
+function dominant_wrong_predictions(
+    X,
+    sample_labels;
+    spec,
+    fit_kwargs=(;),
+    num_outer_folds=4,
+    num_outer_folds_repeats=20,
+    num_inner_folds=3,
+    num_inner_folds_repeats=3,
+    max_components=spec.ncomponents,
+    reshuffle_outer_folds=true,
+    rng=MersenneTwister(54321),
+    verbose=false,
+)
+    Y, responselabels = onehot(sample_labels)
+    fit_kwargs = NCPLS.with_response_labels(fit_kwargs, responselabels)
+    cb = NCPLS.cv_classification()
+
+    n_samples = size(X, 1)
+    misclass_counts = zeros(Int, n_samples, length(responselabels))
+    fixed_folds = reshuffle_outer_folds ? nothing :
+        NCPLS.build_folds(n_samples, num_outer_folds, rng; strata=sample_labels)
+
+    for outer_fold_idx in 1:num_outer_folds_repeats
+        folds = reshuffle_outer_folds ?
+            NCPLS.build_folds(n_samples, num_outer_folds, rng; strata=sample_labels) :
+            fixed_folds
+        test_indices = reshuffle_outer_folds ? folds[1] : folds[outer_fold_idx]
+
+        X_test = NCPLS.subset_samples(X, test_indices)
+        Y_test = NCPLS.subset_samples(Y, test_indices)
+
+        train_indices = setdiff(1:n_samples, test_indices)
+        X_train = NCPLS.subset_samples(X, train_indices)
+        Y_train = NCPLS.subset_samples(Y, train_indices)
+
+        base_fold_kwargs = NCPLS.subset_fit_kwargs(fit_kwargs, train_indices, n_samples)
+        fold_kwargs = NCPLS.resolve_obs_weights(
+            base_fold_kwargs,
+            NCPLS.default_da_obs_weight_fn,
+            X_train,
+            Y_train,
+            train_indices,
+            spec,
+        )
+        fold_kwargs = NCPLS.ensure_response_labels(fold_kwargs, Y_train)
+
+        best_k = NCPLS.optimize_num_latent_variables(
+            X_train,
+            Y_train,
+            max_components,
+            num_inner_folds,
+            num_inner_folds_repeats,
+            spec,
+            base_fold_kwargs,
+            NCPLS.default_da_obs_weight_fn,
+            cb.score_fn,
+            cb.predict_fn,
+            cb.select_fn,
+            rng,
+            verbose;
+            strata=sample_labels[train_indices],
+            sample_indices=train_indices,
+        )
+
+        final_model = NCPLS.fit_ncpls_light(
+            NCPLS.with_n_components(spec, best_k),
+            X_train,
+            Y_train;
+            fold_kwargs...,
+        )
+        Y_pred = cb.predict_fn(final_model, X_test, best_k)
+        true_idx = sampleclasses(Y_test)
+        pred_idx = sampleclasses(Y_pred)
+
+        for (local_idx, global_idx) in enumerate(test_indices)
+            pred_idx[local_idx] == true_idx[local_idx] && continue
+            misclass_counts[global_idx, pred_idx[local_idx]] += 1
+        end
+    end
+
+    dominant_wrong_class = Vector{Union{Missing, String}}(undef, n_samples)
+    fill!(dominant_wrong_class, missing)
+    for i in 1:n_samples
+        counts = misclass_counts[i, :]
+        total_wrong = sum(counts)
+        total_wrong == 0 && continue
+
+        max_wrong = maximum(counts)
+        winners = findall(==(max_wrong), counts)
+        dominant_wrong_class[i] = join(string.(responselabels[winners]), " / ")
+    end
+
+    (;
+        responselabels=responselabels,
+        misclass_counts=misclass_counts,
+        dominant_wrong_class=dominant_wrong_class,
+    )
+end
+
 outlier_scan = outlierscan(
     data.X,
     data.sampleclasses;
@@ -282,16 +382,33 @@ outlier_scan = outlierscan(
 )
 
 flagged_idx = findall(>=(0.4), outlier_scan.rate)
+wrong_prediction_summary = dominant_wrong_predictions(
+    data.X,
+    data.sampleclasses;
+    spec=spec,
+    fit_kwargs=fit_kwargs,
+    num_outer_folds=4,
+    num_outer_folds_repeats=20,
+    num_inner_folds=3,
+    num_inner_folds_repeats=3,
+    max_components=2,
+    rng=MersenneTwister(54321),
+    verbose=false,
+)
 
-hcat(
-    data.samplelabels[flagged_idx],
-    string.(round.(outlier_scan.rate[flagged_idx]; digits=3)),
+(;
+    sample=data.samplelabels[flagged_idx],
+    true_class=string.(data.sampleclasses[flagged_idx]),
+    dominant_wrong_class=coalesce.(wrong_prediction_summary.dominant_wrong_class[flagged_idx], "none"),
+    flag_rate=round.(outlier_scan.rate[flagged_idx]; digits=3),
 )
 ```
 
 To view those samples in the fitted latent space, we fit a two-component DA model to the
 full dataset using the same inverse-frequency weighting rule that the DA CV wrappers use
-within each training split, then overlay the flagged samples.
+within each training split, then overlay the flagged samples. The underlying point color
+still encodes the true class. The overlaid cross and text label show the dominant wrong
+class assignment observed across the repeated held-out predictions.
 
 ```@example crossvalidation_examples
 class_weights = invfreqweights(data.sampleclasses)
@@ -308,7 +425,7 @@ outlier_view_model = fit(
 fig_outliers = Figure(size=(900, 600))
 ax_outliers = Axis(
     fig_outliers[1, 1],
-    title="DA scores with outlier-scan flags",
+    title="DA scores with dominant wrong predictions",
 )
 
 scoreplot(
@@ -325,15 +442,33 @@ scoreplot(
     show_inspector=false,
 )
 
+flagged_scores = xscores(outlier_view_model)[flagged_idx, 1:2]
+wrong_classes = coalesce.(wrong_prediction_summary.dominant_wrong_class[flagged_idx], "none")
+true_classes = string.(data.sampleclasses[flagged_idx])
+transition_labels = string.(true_classes, " -> ", wrong_classes)
+wrong_class_colors = map(wrong_classes) do label
+    label == "minor" ? orange : label == "major" ? blue : :black
+end
+
 scatter!(
     ax_outliers,
-    xscores(outlier_view_model)[flagged_idx, 1],
-    xscores(outlier_view_model)[flagged_idx, 2];
-    color=:red,
+    flagged_scores[:, 1],
+    flagged_scores[:, 2];
+    color=wrong_class_colors,
     marker=:xcross,
-    markersize=18,
-    strokewidth=2,
-    label="rate ≥ 0.4",
+    markersize=20,
+    strokecolor=:black,
+    strokewidth=1.5,
+)
+
+text!(
+    ax_outliers,
+    flagged_scores[:, 1] .+ 0.012,
+    flagged_scores[:, 2] .+ 0.006;
+    text=transition_labels,
+    color=wrong_class_colors,
+    fontsize=16,
+    align=(:left, :center),
 )
 
 axislegend(ax_outliers, position=:rb)
@@ -346,7 +481,9 @@ nothing # hide
 
 This does not prove that the flagged sample is mislabeled or bad. It only shows that,
 under repeated held-out prediction, this sample is unusually unstable relative to the
-rest of the dataset. In practice, such samples are candidates for closer inspection.
+rest of the dataset. In this example, the annotation makes that instability more
+specific: it shows which wrong class the flagged sample is most often assigned to. In
+practice, such samples are candidates for closer inspection.
 
 ## API
 
