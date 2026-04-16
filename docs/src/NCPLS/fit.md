@@ -1,6 +1,5 @@
 # Fit
 
-
 ## API
 
 ```@docs

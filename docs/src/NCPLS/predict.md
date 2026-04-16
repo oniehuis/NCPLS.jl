@@ -3,4 +3,6 @@
 ```@docs
 NCPLS.predict
 NCPLS.project
+NCPLS.onehot
+NCPLS.sampleclasses
 ```

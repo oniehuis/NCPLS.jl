@@ -242,6 +242,20 @@ function cv_regression(;
     (score_fn=score_fn, predict_fn=predict_fn, select_fn=select_fn)
 end
 
+"""
+    cvreg(X, Y; spec, fit_kwargs=(;), num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
+          num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
+          max_components=spec.ncomponents, reshuffle_outer_folds=false,
+          rng=Random.GLOBAL_RNG, verbose=true)
+    cvreg(X, y; kwargs...)
+
+Run nested cross-validation for NCPLS regression.
+
+The matrix method expects a numeric response block `Y`; the vector method is a convenience
+wrapper for univariate regression and reshapes `y` to a one-column matrix. The return
+value is the same tuple as [`nestedcv`](@ref): the outer-fold scores and the selected
+number of latent variables per outer fold.
+"""
 function cvreg(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real};
@@ -285,6 +299,20 @@ function cvreg(
     cvreg(X, reshape(y, :, 1); kwargs...)
 end
 
+"""
+    permreg(X, Y; spec, fit_kwargs=(;), num_permutations=999, num_outer_folds=8,
+            num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
+            num_inner_folds_repeats=num_inner_folds, max_components=spec.ncomponents,
+            reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
+    permreg(X, y; kwargs...)
+
+Run a permutation test around nested NCPLS regression cross-validation.
+
+The matrix method expects a numeric response block `Y`; the vector method is a
+convenience wrapper for univariate regression. The returned vector contains one
+cross-validation score for each permutation and can be compared to the observed score
+from [`cvreg`](@ref), for example via [`pvalue`](@ref).
+"""
 function permreg(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real};
@@ -330,6 +358,21 @@ function permreg(
     permreg(X, reshape(y, :, 1); kwargs...)
 end
 
+"""
+    cvda(X, Y; spec, fit_kwargs=(;), weighted=true, num_outer_folds=8,
+         num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
+         num_inner_folds_repeats=num_inner_folds, max_components=spec.ncomponents,
+         reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
+    cvda(X, sample_labels; kwargs...)
+
+Run nested cross-validation for NCPLS discriminant analysis.
+
+The matrix method expects a one-hot encoded response matrix `Y`; the vector method accepts
+class labels and converts them internally to one-hot form. Outer and inner folds are
+stratified by class. The return value is the same tuple as [`nestedcv`](@ref): the
+outer-fold classification scores and the selected number of latent variables per outer
+fold.
+"""
 function cvda(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real};
@@ -406,6 +449,21 @@ function cvda(
     )
 end
 
+"""
+    permda(X, Y; spec, fit_kwargs=(;), weighted=true, num_permutations=999,
+           num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
+           num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
+           max_components=spec.ncomponents, reshuffle_outer_folds=false,
+           rng=Random.GLOBAL_RNG, verbose=true)
+    permda(X, sample_labels; kwargs...)
+
+Run a permutation test around nested NCPLS discriminant-analysis cross-validation.
+
+The matrix method expects a one-hot encoded response matrix `Y`; the vector method
+accepts class labels and converts them internally to one-hot form. The returned vector
+contains one cross-validation score for each permutation and can be compared to the
+observed score from [`cvda`](@ref), for example via [`pvalue`](@ref).
+"""
 function permda(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real};
