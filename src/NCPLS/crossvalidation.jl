@@ -42,16 +42,7 @@ end
 
 Decode one-hot rows back to 1-based class indices.
 """
-function sampleclasses(one_hot_matrix::AbstractMatrix{<:Real})
-    all(value -> value == 0 || value == 1, one_hot_matrix) || throw(ArgumentError(
-        "one_hot_matrix must contain only 0/1 entries"))
-
-    row_sums = vec(sum(one_hot_matrix; dims=2))
-    all(==(1), row_sums) || throw(ArgumentError(
-        "each row of one_hot_matrix must contain exactly one 1"))
-
-    [argmax(row) for row in eachrow(one_hot_matrix)]
-end
+sampleclasses(one_hot_matrix::AbstractMatrix{<:Real}) = decode_one_hot_indices(one_hot_matrix)
 
 """
     invfreqweights(samples::AbstractVector)
@@ -149,31 +140,79 @@ function onehot(
     onehot(predicted_class_indices, size(predictions, 3))
 end
 
+function class_response_columns(mf::NCPLSFit)
+    cols = class_response_columns(sampleclasses(mf), responselabels(mf))
+    if !isnothing(cols)
+        return cols
+    end
+
+    Ytrain = fitted(mf) + residuals(mf)
+    is_one_hot_matrix(Ytrain) && return collect(1:size(Ytrain, 2))
+
+    throw(ArgumentError(
+        "This fitted model does not define class-response columns. Pass categorical " *
+        "labels to `fit`, or provide `sampleclasses` plus matching `responselabels` " *
+        "for the class-indicator part of a custom response matrix."
+    ))
+end
+
+function onehot(
+    mf::NCPLSFit,
+    predictions::AbstractArray{<:Real, 3},
+)
+    size(predictions, 2) > 0 || throw(ArgumentError(
+        "predictions must contain at least one component slice"))
+
+    classcols = class_response_columns(mf)
+    predicted_scores = @views predictions[:, end, classcols]
+    predicted_class_indices = argmax.(eachrow(predicted_scores))
+    onehot(predicted_class_indices, length(classcols))
+end
+
+"""
+    predictclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
+    predictclasses(mf::NCPLSFit, predictions::AbstractArray{<:Real, 3})
+
+Map NCPLS predictions back to class labels using the inferred class-response block.
+"""
+function predictclasses(
+    mf::NCPLSFit,
+    X::AbstractArray{<:Real},
+    ncomps::Integer=ncomponents(mf),
+)
+    predictclasses(mf, predict(mf, X, ncomps))
+end
+
+function predictclasses(
+    mf::NCPLSFit,
+    predictions::AbstractArray{<:Real, 3},
+)
+    classcols = class_response_columns(mf)
+    isempty(responselabels(mf)) && throw(ArgumentError(
+        "responselabels must be provided to map predictions to class labels"))
+
+    classlabels = responselabels(mf)[classcols]
+    classlabels[sampleclasses(onehot(mf, predictions))]
+end
+
 """
     sampleclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
 
-Map NCPLS predictions back to the stored response labels.
+Map NCPLS predictions back to class labels. This is an alias for [`predictclasses`](@ref).
 """
 function sampleclasses(
     mf::NCPLSFit,
     X::AbstractArray{<:Real},
     ncomps::Integer=ncomponents(mf),
 )
-    sampleclasses(mf, predict(mf, X, ncomps))
+    predictclasses(mf, X, ncomps)
 end
 
 function sampleclasses(
     mf::NCPLSFit,
     predictions::AbstractArray{<:Real, 3},
 )
-    isempty(responselabels(mf)) && throw(ArgumentError(
-        "responselabels must be provided to map predictions to class labels"))
-
-    n_classes = size(predictions, 3)
-    length(responselabels(mf)) == n_classes || throw(DimensionMismatch(
-        "responselabels must have length $n_classes, got $(length(responselabels(mf)))"))
-
-    responselabels(mf)[sampleclasses(onehot(mf, predictions))]
+    predictclasses(mf, predictions)
 end
 
 """

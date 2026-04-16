@@ -125,6 +125,39 @@ end
     @test NCPLS.sampleclasses(mf, preds) == NCPLS.responselabels(mf)[NCPLS.sampleclasses(expected)]
 end
 
+@testset "classification helpers isolate class columns in mixed response fits" begin
+    X = CROSSVAL_X_MATRIX[1:4, :]
+    class_labels = ["A", "B", "A", "B"]
+    Yclass, _ = NCPLS.onehot(class_labels)
+    Ymixed = hcat(Yclass, reshape([10.0, 20.0, 30.0, 40.0], :, 1))
+
+    mf = NCPLS.fit(
+        NCPLSModel(ncomponents = 2, multilinear = false),
+        X,
+        Ymixed;
+        sampleclasses = class_labels,
+        responselabels = ["A", "B", "trait"],
+    )
+
+    preds = zeros(Float64, 4, 2, 3)
+    preds[:, 2, :] = [
+        0.9 0.1 10.0
+        0.2 0.8 11.0
+        0.6 0.4 12.0
+        0.1 0.9 13.0
+    ]
+    expected = [
+        1 0
+        0 1
+        1 0
+        0 1
+    ]
+
+    @test NCPLS.onehot(mf, preds) == expected
+    @test NCPLS.predictclasses(mf, preds) == ["A", "B", "A", "B"]
+    @test NCPLS.sampleclasses(mf, preds) == ["A", "B", "A", "B"]
+end
+
 @testset "random_batch_indices builds stratified folds" begin
     strata = vcat(fill(1, 6), fill(2, 6))
     folds = NCPLS.random_batch_indices(strata, 3, MersenneTwister(1))

@@ -394,6 +394,69 @@ end
     )
 end
 
+@testset "fit allows sampleclasses as metadata for vector responses" begin
+    model = NCPLS.NCPLSModel(ncomponents = 1, multilinear = false)
+    X = Float64[
+        1 2
+        2 3
+        3 4
+        4 5
+    ]
+    y = [0.5, 1.0, 1.5, 2.0]
+
+    mf = NCPLS.fit(
+        model,
+        X,
+        y;
+        sampleclasses = [:A, :B, :A, :B],
+    )
+
+    @test NCPLS.sampleclasses(mf) == [:A, :B, :A, :B]
+    @test size(NCPLS.predict(mf, X, 1)) == (4, 1, 1)
+end
+
+@testset "fit validates class metadata against custom response blocks" begin
+    model = NCPLS.NCPLSModel(ncomponents = 1, multilinear = false)
+    X = Float64[
+        1 2
+        2 1
+        3 4
+        4 3
+    ]
+    sampleclasses = ["A", "B", "A", "B"]
+    Yclass, _ = NCPLS.onehot(sampleclasses)
+    Ymixed = hcat(Yclass, reshape([10.0, 20.0, 30.0, 40.0], :, 1))
+
+    mf = NCPLS.fit(
+        model,
+        X,
+        Ymixed;
+        sampleclasses = sampleclasses,
+        responselabels = ["A", "B", "trait"],
+    )
+
+    @test NCPLS.sampleclasses(mf) == sampleclasses
+    @test NCPLS.responselabels(mf) == ["A", "B", "trait"]
+
+    @test_throws ArgumentError NCPLS.fit(
+        model,
+        X,
+        Ymixed;
+        sampleclasses = sampleclasses,
+        responselabels = ["A", "trait", "other"],
+    )
+
+    Ybad = copy(Ymixed)
+    Ybad[1, 1:2] .= [0.5, 0.5]
+    @test_throws ArgumentError NCPLS.fit(
+        model,
+        X,
+        Ybad;
+        sampleclasses = sampleclasses,
+        responselabels = ["A", "B", "trait"],
+    )
+end
+
 @testset "fit stores multilinear mode weights and diagnostics" begin
     model = NCPLS.NCPLSModel(
         ncomponents = 2,

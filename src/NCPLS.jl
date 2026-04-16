@@ -42,6 +42,7 @@ export permda
 export permreg
 export pvalue
 export predict
+export predictclasses
 export predictoraxes
 export project
 export random_batch_indices
