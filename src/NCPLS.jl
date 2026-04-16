@@ -6,8 +6,8 @@ using Statistics
 import StatsAPI: fit, predict, fitted, coef, residuals
 using CategoricalArrays
 
-using Reexport: @reexport
-@reexport using CategoricalArrays
+using CategoricalArrays: categorical, CategoricalArray, CategoricalVector, levels
+export categorical, CategoricalArray, CategoricalVector, levels
 
 include("NCPLS/types.jl")
 include("NCPLS/computations.jl")
