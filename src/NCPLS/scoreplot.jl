@@ -1,48 +1,102 @@
-"""
+const SCOREPLOT_DOC = """
     scoreplot(samples, groups, scores; backend=:plotly, kwargs...)
     scoreplot(mf::NCPLSFit; backend=:plotly, kwargs...)
 
-Backend dispatcher for NCPLS score plots.
+Backend dispatcher for NCPLS score plots. Use `backend=:plotly` (default) for the
+PlotlyJS extension or `backend=:makie` for the Makie extension.
 
-The raw method accepts sample labels, grouping labels, and a score matrix with at least
-two columns. The fit method reads `samplelabels`, `sampleclasses`, and the first two
-predictor scores from an `NCPLSFit`.
+The dispatcher accepts *backend-agnostic* keywords and passes any remaining
+keywords to the selected backend. To avoid confusion, think of the keywords as
+belonging to three groups:
 
-Requirements
-- `scores` must have at least two columns.
-- `sampleclasses(mf)` must be present.
-- The fitted model must contain at least two latent variables.
-
-General keywords
+General (backend-agnostic)
 - `backend::Symbol = :plotly`
-  Select the plotting backend. Supported values: `:plotly` and `:makie`.
+  Select the backend. Supported values: `:plotly`, `:makie`.
+
+PlotlyJS backend keywords (PlotlyJSExtension)
+- `group_order::Union{Nothing,AbstractVector} = nothing`
+  Order of groups (also draw order; later is on top). If `nothing`, uses
+  `levels(groups)` for `CategoricalArray`, else `unique(groups)`.
+- `default_trace = (;)`
+  PlotlyJS scatter kwargs applied to every group (except marker).
+- `group_trace::AbstractDict = Dict()`
+  Per-group PlotlyJS scatter kwargs.
+- `default_marker = (;)`
+  PlotlyJS marker kwargs for every group (keys must be `Symbol`s).
+- `group_marker::AbstractDict = Dict()`
+  Per-group marker kwargs (keys must be `Symbol`s).
+- `hovertemplate::AbstractString = "Sample: %{text}<br>Group: %{fullData.name}<br>LV1: %{x}<br>LV2: %{y}<extra></extra>"`
+  Hover text template. The default shows sample, group, LV1, LV2.
+- `layout::Union{Nothing,PlotlyJS.Layout} = nothing`
+  Layout object; if `nothing`, a default layout is created using `title`, `xlabel`,
+  and `ylabel`.
+- `plot_kwargs = (;)`
+  Extra kwargs passed to `PlotlyJS.plot` (e.g., `config`).
+- `show_legend::Union{Nothing,Bool} = nothing`
+  If `false`, sets `showlegend=false` for all traces.
+- `title::AbstractString = "Scores"`
+- `xlabel::AbstractString = "Latent Variable 1"`
+- `ylabel::AbstractString = "Latent Variable 2"`
+
+Makie backend keywords (MakieExtension)
+- `group_order::Union{Nothing,AbstractVector} = nothing`
+  Order of groups (also draw order).
+- `default_scatter = (;)`
+  Makie scatter kwargs applied to every group.
+- `group_scatter::AbstractDict = Dict()`
+  Per-group scatter kwargs.
+- `default_trace = (;)`
+  Additional scatter kwargs applied to every group (legacy convenience).
+- `group_trace::AbstractDict = Dict()`
+  Per-group scatter kwargs (legacy convenience).
+- `default_marker = (;)`
+  Marker-related kwargs applied to every group.
+- `group_marker::AbstractDict = Dict()`
+  Per-group marker kwargs.
+- `title::AbstractString = "Scores"`
+- `xlabel::AbstractString = "Latent Variable 1"`
+- `ylabel::AbstractString = "Latent Variable 2"`
+- `figure = nothing`
+  Provide an existing `Figure` to draw into.
+- `axis = nothing`
+  Provide an existing `Axis` to draw into.
+- `figure_kwargs = (;)`
+  Extra kwargs passed to `Figure` when it is created.
+- `axis_kwargs = (;)`
+  Extra kwargs passed to `Axis` when it is created.
+- `show_legend::Bool = true`
+  If `true`, calls `axislegend`.
+- `legend_kwargs = (;)`
+  Extra kwargs passed to `axislegend`.
+- `show_inspector::Bool = true`
+  If `true`, enables `DataInspector` on GLMakie/WGLMakie.
+- `inspector_kwargs = (;)`
+  Extra kwargs passed to `DataInspector`.
+
+Notes
+- The dispatcher checks that the requested backend is loaded and errors with
+  "Backend <pkg> not loaded" if not.
+- Unknown backend values throw `error("Unknown backend")`.
+- `scores` must have at least two columns (LV1 and LV2).
 """
 function scoreplot end
-
-function scoreplot_makie end
-function scoreplot_makie(args...; kwargs...)
-    _require_scoreplot_extension(:MakieExtension, "Makie or CairoMakie")
-    error("Unreachable")
-end
+Base.@doc SCOREPLOT_DOC scoreplot
 
 function scoreplot_plotly end
-function scoreplot_plotly(args...; kwargs...)
-    _require_scoreplot_extension(:PlotlyJSExtension, "PlotlyJS")
-    error("Unreachable")
-end
+function scoreplot_makie end
 
-function _require_scoreplot_extension(extsym::Symbol, pkg::AbstractString)
+function _require_extension(extsym::Symbol, pkg::AbstractString)
     Base.get_extension(@__MODULE__, extsym) === nothing &&
         error("Backend $(pkg) not loaded. Run `using $(pkg)` first.")
     return nothing
 end
 
-const _require_scoreplot_extension_ref = Ref{Function}(_require_scoreplot_extension)
-const _scoreplot_makie_ref = Ref{Function}(
-    (samples, groups, scores; kwargs...) -> scoreplot_makie(samples, groups, scores; kwargs...)
-)
+const _require_extension_ref = Ref{Function}(_require_extension)
 const _scoreplot_plotly_ref = Ref{Function}(
     (samples, groups, scores; kwargs...) -> scoreplot_plotly(samples, groups, scores; kwargs...)
+)
+const _scoreplot_makie_ref = Ref{Function}(
+    (samples, groups, scores; kwargs...) -> scoreplot_makie(samples, groups, scores; kwargs...)
 )
 
 function scoreplot(
@@ -53,10 +107,10 @@ function scoreplot(
     kwargs...,
 )
     if backend === :plotly
-        _require_scoreplot_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
+        _require_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
         return _scoreplot_plotly_ref[](samples, groups, scores; kwargs...)
     elseif backend === :makie
-        _require_scoreplot_extension_ref[](:MakieExtension, "Makie or CairoMakie")
+        _require_extension_ref[](:MakieExtension, "Makie")
         return _scoreplot_makie_ref[](samples, groups, scores; kwargs...)
     else
         error("Unknown backend")
@@ -65,7 +119,7 @@ end
 
 function scoreplot(
     mf::NCPLSFit;
-    backend::Symbol=:plotly,
+    backend::Symbol = :plotly,
     kwargs...,
 )
     groups = sampleclasses(mf)
@@ -74,10 +128,20 @@ function scoreplot(
         "Pass `sampleclasses=` to `fit` or call scoreplot(samples, groups, scores) directly."
     ))
 
+    samples = samplelabels(mf)
     size(mf.T, 2) >= 2 || throw(ArgumentError(
         "scoreplot(mf) requires at least 2 components; got $(size(mf.T, 2)). " *
         "Refit with ncomponents >= 2 or call scoreplot(samples, groups, scores) with a custom 2-column score matrix."
     ))
+    scores = mf.T[:, 1:2]
 
-    scoreplot(samplelabels(mf), groups, xscores(mf, 1:2); backend = backend, kwargs...)
+    if backend === :plotly
+        _require_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
+        return _scoreplot_plotly_ref[](samples, groups, scores; kwargs...)
+    elseif backend === :makie
+        _require_extension_ref[](:MakieExtension, "Makie")
+        return _scoreplot_makie_ref[](samples, groups, scores; kwargs...)
+    else
+        error("Unknown backend")
+    end
 end

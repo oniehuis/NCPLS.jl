@@ -1,7 +1,7 @@
 # NCPLS.jl
 
 [NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) provides a Julia implementation of the 
-N-way Canonical Partial Least Squares (NCPLS) algorithm, as proposed by Liland et al. 
+N-way Canonical Partial Least Squares (N-CPLS) algorithm, as proposed by Liland et al. 
 (2022), for both regression and discriminant analysis of tensor-valued predictors. This 
 method extends the CPLS approach introduced by Indahl et al. (2009), which was originally 
 designed for matrix-shaped predictors. The matrix-based approach is implemented in the 
@@ -34,14 +34,9 @@ resulting fitted models provide prediction, class assignment where a class block
 latent projections, regression coefficients, fitted values, residuals, and labels or 
 metadata retained from model fitting.
 
-[NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) also includes helper functionality for 
-common preprocessing and encoding tasks, including one-hot encoding of class labels and 
-utility functions used in chemometric and multivariate workflows. In addition, the package 
-provides dedicated cross-validation and permutation-testing routines for regression and 
-discriminant analysis, together with visualization helpers for score plots, coefficient 
-landscapes, loading-weight landscapes, and multilinear weight profiles. Fitting can also 
-include optional additional responses through `Yadd`, which influence component extraction 
-but are not themselves prediction targets, and optional observation weights for weighted 
+[NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) includes helper functionality for common preprocessing and encoding tasks, including one-hot encoding of class labels and utility functions used in chemometric and multivariate workflows. In addition, the package provides dedicated cross-validation and permutation-testing routines for regression and discriminant analysis, together with visualization helpers for score plots, coefficient landscapes, loading-weight landscapes, and multilinear weight profiles. Fitting can also include 
+optional additional responses through `Yadd`, which influence component extraction but are 
+not themselves prediction targets, and optional observation weights for weighted 
 preprocessing and supervised fitting. The dedicated discriminant-analysis cross-validation 
 helpers target categorical labels or pure one-hot class-indicator matrices; hybrid response 
 workflows rely on the more general nested cross-validation functions with custom callbacks.
@@ -59,26 +54,26 @@ data = synthetic_multilinear_hybrid_data(
     nminor=40,
     mode_dims=(40, 30),
     orthogonal_truth=true,
-    integer_counts=false,
+    integer_counts=false
 )
 
 model = NCPLSModel(
     ncomponents=2,
     multilinear=true,
-    orthogonalize_mode_weights=true,
+    orthogonalize_mode_weights=true
 )
 
 mf = fit(
     model,
     data.X,
-    categorical(data.sampleclasses);
+    categorical(data.sampleclasses_string);
     Yadd=data.Yadd,
     obs_weights=data.obs_weights,
     samplelabels=data.samplelabels,
-    predictoraxes=data.predictoraxes,
+    predictoraxes=data.predictoraxes
 )
 
-plt = scoreplot(mf; backend=:makie)
+plt = scoreplot(mf; backend=:makie, figure_kwargs=(; size=(900, 600)))
 save("quickstart_scoreplot.svg", plt)
 nothing # hide
 ```

@@ -1,20 +1,27 @@
+using CategoricalArrays
+
 function NCPLS.scoreplot_makie(
     samples::AbstractVector{<:AbstractString},
     groups,
     scores::AbstractMatrix{<:Real};
-    group_order::Union{Nothing, AbstractVector} = nothing,
-    default_scatter = (;),
-    group_scatter::AbstractDict = Dict(),
-    default_color = nothing,
-    group_color::AbstractDict = Dict(),
-    palette = Makie.wong_colors(),
-    axis = (;),
-    figure = (;),
-    legend = (;),
-    show_legend::Bool = true,
-    title::AbstractString = "Scores",
-    xlabel::AbstractString = "Latent Variable 1",
-    ylabel::AbstractString = "Latent Variable 2",
+    group_order::Union{Nothing,AbstractVector}=nothing,
+    default_scatter=(;),
+    group_scatter::AbstractDict=Dict(),
+    default_trace=(;),
+    group_trace::AbstractDict=Dict(),
+    default_marker=(;),
+    group_marker::AbstractDict=Dict(),
+    title::AbstractString="Scores",
+    xlabel::AbstractString="Latent Variable 1",
+    ylabel::AbstractString="Latent Variable 2",
+    figure=nothing,
+    axis=nothing,
+    figure_kwargs=(;),
+    axis_kwargs=(;),
+    show_legend::Bool=true,
+    legend_kwargs=(;),
+    show_inspector::Bool=true,
+    inspector_kwargs=(;),
 )
     size(scores, 2) >= 2 || error("scores must have at least two columns.")
 
@@ -23,43 +30,70 @@ function NCPLS.scoreplot_makie(
     to_nt(::Nothing) = (;)
 
     groups_vec = collect(groups)
-    order = isnothing(group_order) ? unique(groups_vec) : collect(group_order)
+    n_samples = length(groups_vec)
+    order = if !isnothing(group_order)
+        group_order
+    elseif groups isa CategoricalArray
+        levels(groups)
+    else
+        unique(groups_vec)
+    end
 
     getkw(d, g) = haskey(d, g) ? d[g] :
-                  haskey(d, string(g)) ? d[string(g)] : nothing
+                  haskey(d, string(g)) ? d[string(g)] : (;)
+    subset_kw(kw, idx) = (; (
+        key => (value isa AbstractVector && length(value) == n_samples ? value[idx] : value)
+        for (key, value) in pairs(kw)
+    )...)
 
-    fig = Makie.Figure(; to_nt(figure)...)
-    ax = Makie.Axis(
+    fig = isnothing(figure) ? Makie.Figure(; to_nt(figure_kwargs)...) : figure
+    ax = isnothing(axis) ? Makie.Axis(
         fig[1, 1];
-        xlabel = xlabel,
-        ylabel = ylabel,
-        title = title,
-        to_nt(axis)...,
+        title=title,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        to_nt(axis_kwargs)...,
+    ) : axis
+
+    base_scatter = merge(
+        to_nt(default_scatter),
+        to_nt(default_trace),
+        to_nt(default_marker),
     )
 
-    fallback_colors = collect(palette)
-    isempty(fallback_colors) && (fallback_colors = collect(Makie.wong_colors()))
+    backend_mod = _current_backend_ref[]()
+    backend_name = backend_mod === missing ? :missing : nameof(backend_mod)
+    inspector_enabled = show_inspector && (backend_name == :GLMakie || backend_name == :WGLMakie)
 
-    for (k, g) in enumerate(order)
+    for g in order
         idx = findall(==(g), groups_vec)
         isempty(idx) && continue
 
-        scatter_kw = merge(to_nt(default_scatter), to_nt(getkw(group_scatter, g)))
-        color_kw = getkw(group_color, g)
-        color = isnothing(color_kw) ? default_color : color_kw
-        isnothing(color) && (color = fallback_colors[mod1(k, length(fallback_colors))])
+        xs = scores[idx, 1]
+        ys = scores[idx, 2]
+        sub_samples = samples[idx]
 
-        Makie.scatter!(
-            ax,
-            scores[idx, 1],
-            scores[idx, 2];
-            label = string(g),
-            color = color,
-            scatter_kw...,
+        kw = merge(
+            base_scatter,
+            to_nt(getkw(group_scatter, g)),
+            to_nt(getkw(group_trace, g)),
+            to_nt(getkw(group_marker, g)),
         )
+        kw = subset_kw(kw, idx)
+        haskey(kw, :label) || (kw = merge(kw, (label=string(g),)))
+
+        if inspector_enabled
+            haskey(kw, :inspectable) || (kw = merge(kw, (inspectable=true,)))
+            haskey(kw, :inspector_label) || (kw = merge(kw, (inspector_label = (plot, i, pos) -> begin
+                s = sub_samples[i]
+                "Sample: $(s)\nGroup: $(g)\nLV1: $(round(pos[1]; digits=4))\nLV2: $(round(pos[2]; digits=4))"
+            end,)))
+        end
+
+        Makie.scatter!(ax, xs, ys; kw...)
     end
 
-    show_legend && Makie.axislegend(ax; to_nt(legend)...)
-
+    show_legend && Makie.axislegend(ax; to_nt(legend_kwargs)...)
+    inspector_enabled && Makie.DataInspector(fig; to_nt(inspector_kwargs)...)
     fig
 end
