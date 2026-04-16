@@ -7,9 +7,7 @@ For classification-capable fits, NCPLS provides two decoding layers on top of
 `predict`:
 
 - `onehot(mf, X)` returns one-hot predictions for the inferred class-response block,
-- `sampleclasses(mf, X)` maps those class scores back to labels,
-- `predictclasses(mf, X)` is a convenience alias for the prediction overload of
-  `sampleclasses`.
+- `predictclasses(mf, X)` maps those class scores back to labels.
 
 For mixed response blocks such as `[class indicators | continuous traits]`, the class
 helpers use only the inferred class columns, while `predict` still returns all columns.

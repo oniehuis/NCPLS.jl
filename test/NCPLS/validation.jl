@@ -1,25 +1,26 @@
-if !isdefined(NCPLS, :synthetic_gcms_regression_data)
-    validation_dir = normpath(joinpath(@__DIR__, "..", "..", "validation"))
-    for file in (
-        "synthetic_gcms.jl",
-        "synthetic_multilinear.jl",
-        "analysis_helpers.jl",
-        "ncpls_analysis.jl",
-        "multilinear_comparison.jl",
-        "mode_weight_orthogonalization.jl",
-        "multilinear_init_assessment.jl",
-        "multilinear_convergence_assessment.jl",
-        "multilinear_stress_assessment.jl",
-        "yadd_effect.jl",
-        "obs_weight_effect.jl",
-    )
+validation_dir = normpath(joinpath(@__DIR__, "..", "..", "validation"))
+for (symbol, file) in (
+    (:synthetic_gcms_regression_data, "synthetic_gcms.jl"),
+    (:synthetic_multilinear_regression_data, "synthetic_multilinear.jl"),
+    (:synthetic_multilinear_hybrid_data, "synthetic_hybrid.jl"),
+    (:synthetic_gcms_labels, "analysis_helpers.jl"),
+    (:analyze_synthetic_gcms_with_ncpls, "ncpls_analysis.jl"),
+    (:compare_synthetic_multilinear_models, "multilinear_comparison.jl"),
+    (:synthetic_mode_orthogonality_data, "mode_weight_orthogonalization.jl"),
+    (:compare_multilinear_init, "multilinear_init_assessment.jl"),
+    (:compare_multilinear_convergence, "multilinear_convergence_assessment.jl"),
+    (:assess_multilinear_stress, "multilinear_stress_assessment.jl"),
+    (:synthetic_multilinear_yadd_data, "yadd_effect.jl"),
+    (:synthetic_obs_weighted_multilinear_data, "obs_weight_effect.jl"),
+)
+    if !isdefined(NCPLS, symbol)
         Base.include(NCPLS, joinpath(validation_dir, file))
     end
 end
 
 import Random
 import LinearAlgebra: norm
-import Statistics: mean
+import Statistics: cor, mean
 
 @testset "synthetic_multilinear_regression_data covers vector, matrix, and tensor branches" begin
     data1 = NCPLS.synthetic_multilinear_regression_data(
@@ -567,4 +568,148 @@ end
     @test_throws ArgumentError NCPLS.assess_multilinear_stress(
         stress_settings = [(label = :bad, x_noise_scale = -0.1, y_noise_scale = 0.1, component_strength_scale = 1.0)],
     )
+end
+
+@testset "synthetic_multilinear_hybrid_data returns aligned hybrid responses and metadata" begin
+    data = NCPLS.synthetic_multilinear_hybrid_data(
+        nmajor = 18,
+        nminor = 12,
+        mode_dims = (14, 10),
+        integer_counts = false,
+        rng = Random.MersenneTwister(42),
+    )
+
+    @test size(data.X) == (30, 14, 10)
+    @test size(data.Yprim_da) == (30, 2)
+    @test size(data.Yprim_reg) == (30, 2)
+    @test size(data.Yprim_hybrid) == (30, 4)
+    @test data.Yprim == data.Yprim_hybrid
+    @test data.Yprim_hybrid ≈ hcat(data.Yprim_da, data.Yprim_reg)
+    @test size(data.Yadd) == (30, 3)
+    @test size(data.T) == (30, 3)
+    @test size(data.templates) == (14, 10, 3)
+    @test length(data.mode_weights) == 2
+    @test data.classcols == [1, 2]
+    @test data.regressioncols == [3, 4]
+    @test data.responselabels == data.responselabels_hybrid
+    @test data.responselabels_hybrid == vcat(data.responselabels_da, data.responselabels_reg)
+    @test data.yaddlabels == ["class_proxy", "regression_proxy", "blend_proxy"]
+    @test length(data.samplelabels) == 30
+    @test string.(data.sampleclasses) == data.sampleclasses_string
+    @test count(data.noisy_mask) == length(data.noisy_idx)
+    @test count(.!data.noisy_mask) == length(data.clean_idx)
+    @test sort(vcat(data.clean_idx, data.noisy_idx)) == collect(1:30)
+    @test isapprox(mean(data.obs_weights), 1.0; atol = 1e-12)
+    @test all(data.obs_weights[data.clean_idx] .> minimum(data.obs_weights[data.noisy_idx]))
+    @test length(data.predictoraxes) == 2
+    @test data.predictoraxes[1].name == "RT"
+    @test data.predictoraxes[2].name == "m/z"
+end
+
+@testset "synthetic_multilinear_hybrid_data supports DA, regression, and hybrid fits" begin
+    data = NCPLS.synthetic_multilinear_hybrid_data(
+        nmajor = 36,
+        nminor = 24,
+        mode_dims = (16, 12),
+        orthogonal_truth = true,
+        integer_counts = false,
+        class_component_strength = 6.0,
+        regression_component_strength = 5.5,
+        nuisance_component_strength = 3.5,
+        x_noise_scale_clean = 0.02,
+        x_noise_scale_noisy = 0.10,
+        yreg_noise_scale_clean = 0.02,
+        yreg_noise_scale_noisy = 0.08,
+        yadd_noise_scale = 0.02,
+        rng = Random.MersenneTwister(43),
+    )
+
+    model = NCPLS.NCPLSModel(
+        ncomponents = 2,
+        center_X = true,
+        scale_X = false,
+        center_Yprim = true,
+        multilinear = true,
+        orthogonalize_mode_weights = false,
+    )
+
+    mf_da = NCPLS.fit(
+        model,
+        data.X,
+        data.sampleclasses;
+        Yadd = data.Yadd,
+        obs_weights = data.obs_weights,
+        samplelabels = data.samplelabels,
+        predictoraxes = data.predictoraxes,
+    )
+    pred_da = NCPLS.predictclasses(mf_da, data.X, 2)
+    @test length(pred_da) == size(data.X, 1)
+    @test mean(pred_da .== data.sampleclasses_string) ≥ 0.80
+
+    mf_reg = NCPLS.fit(
+        model,
+        data.X,
+        data.Yprim_reg;
+        Yadd = data.Yadd,
+        obs_weights = data.obs_weights,
+        samplelabels = data.samplelabels,
+        responselabels = data.responselabels_reg,
+        predictoraxes = data.predictoraxes,
+    )
+    Yhat_reg = NCPLS.predict(mf_reg, data.X, 2)[:, end, :]
+    @test size(Yhat_reg) == size(data.Yprim_reg)
+    @test all(j -> cor(Yhat_reg[:, j], data.Yprim_reg[:, j]) ≥ 0.80, axes(data.Yprim_reg, 2))
+
+    mf_hybrid = NCPLS.fit(
+        model,
+        data.X,
+        data.Yprim_hybrid;
+        Yadd = data.Yadd,
+        obs_weights = data.obs_weights,
+        samplelabels = data.samplelabels,
+        sampleclasses = data.sampleclasses,
+        responselabels = data.responselabels_hybrid,
+        predictoraxes = data.predictoraxes,
+    )
+    Yhat_hybrid = NCPLS.predict(mf_hybrid, data.X, 2)
+    pred_hybrid = NCPLS.predictclasses(mf_hybrid, Yhat_hybrid)
+    @test size(Yhat_hybrid) == (size(data.X, 1), 2, size(data.Yprim_hybrid, 2))
+    @test mean(pred_hybrid .== data.sampleclasses_string) ≥ 0.80
+    @test all(
+        j -> cor(Yhat_hybrid[:, end, data.regressioncols[j]], data.Yprim_reg[:, j]) ≥ 0.75,
+        eachindex(data.regressioncols),
+    )
+end
+
+@testset "synthetic_multilinear_hybrid_data toggles true mode overlap with orthogonal_truth" begin
+    orth = NCPLS.synthetic_multilinear_hybrid_data(
+        nmajor = 18,
+        nminor = 12,
+        mode_dims = (18, 12),
+        orthogonal_truth = true,
+        integer_counts = false,
+        rng = Random.MersenneTwister(44),
+    )
+    overlap = NCPLS.synthetic_multilinear_hybrid_data(
+        nmajor = 18,
+        nminor = 12,
+        mode_dims = (18, 12),
+        orthogonal_truth = false,
+        integer_counts = false,
+        rng = Random.MersenneTwister(44),
+    )
+
+    orth_offdiag = vcat([
+        [abs(ip[i, j]) for i in 1:size(ip, 1) for j in (i + 1):size(ip, 2)]
+        for ip in orth.true_mode_inner_products
+    ]...)
+    overlap_offdiag = vcat([
+        [abs(ip[i, j]) for i in 1:size(ip, 1) for j in (i + 1):size(ip, 2)]
+        for ip in overlap.true_mode_inner_products
+    ]...)
+
+    @test orth.orthogonal_truth === true
+    @test overlap.orthogonal_truth === false
+    @test mean(orth_offdiag) < mean(overlap_offdiag)
+    @test maximum(orth_offdiag) < maximum(overlap_offdiag)
 end

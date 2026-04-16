@@ -19,6 +19,7 @@ include("NCPLS/scoreplot.jl")
 include("NCPLS/preprocessing.jl")
 include("NCPLS/predict.jl")
 include("NCPLS/crossvalidation.jl")
+include("../validation/synthetic_hybrid.jl")
 
 export AbstractNCPLSFit
 export NCPLSFit
@@ -51,6 +52,7 @@ export responselabels
 export sampleclasses
 export samplelabels
 export scoreplot
+export synthetic_multilinear_hybrid_data
 export cv_classification
 export cv_regression
 export cvda

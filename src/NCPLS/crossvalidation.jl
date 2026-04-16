@@ -177,8 +177,7 @@ end
     predictclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
     predictclasses(mf::NCPLSFit, predictions::AbstractArray{<:Real, 3})
 
-Map NCPLS predictions back to class labels using the inferred class-response block. The
-method is a convenience alias for the prediction overload of [`sampleclasses`](@ref).
+Map NCPLS predictions back to class labels using the inferred class-response block.
 """
 function predictclasses(
     mf::NCPLSFit,
@@ -198,26 +197,6 @@ function predictclasses(
 
     classlabels = responselabels(mf)[classcols]
     classlabels[sampleclasses(onehot(mf, predictions))]
-end
-
-"""
-    sampleclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
-
-Map NCPLS predictions back to class labels. This is an alias for [`predictclasses`](@ref).
-"""
-function sampleclasses(
-    mf::NCPLSFit,
-    X::AbstractArray{<:Real},
-    ncomps::Integer=ncomponents(mf),
-)
-    predictclasses(mf, X, ncomps)
-end
-
-function sampleclasses(
-    mf::NCPLSFit,
-    predictions::AbstractArray{<:Real, 3},
-)
-    predictclasses(mf, predictions)
 end
 
 """

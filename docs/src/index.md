@@ -46,16 +46,62 @@ preprocessing and supervised fitting. The dedicated discriminant-analysis cross-
 helpers target categorical labels or pure one-hot class-indicator matrices; hybrid response 
 workflows rely on the more general nested cross-validation functions with custom callbacks.
 
+## Quick Start
+
+```@example quickstart
+using NCPLS
+using CategoricalArrays
+using Statistics
+using CairoMakie
+
+data = synthetic_multilinear_hybrid_data(
+    nmajor=60,
+    nminor=40,
+    mode_dims=(40, 30),
+    orthogonal_truth=true,
+    integer_counts=false,
+)
+
+model = NCPLSModel(
+    ncomponents=2,
+    multilinear=true,
+    orthogonalize_mode_weights=true,
+)
+
+mf = fit(
+    model,
+    data.X,
+    categorical(data.sampleclasses);
+    Yadd=data.Yadd,
+    obs_weights=data.obs_weights,
+    samplelabels=data.samplelabels,
+    predictoraxes=data.predictoraxes,
+)
+
+plt = scoreplot(mf; backend=:makie)
+save("quickstart_scoreplot.svg", plt)
+nothing # hide
+```
+
+![](quickstart_scoreplot.svg)
+
+```@example quickstart
+
+pred_classes = predictclasses(mf, data.X, 2)
+class_accuracy = mean(pred_classes .== data.sampleclasses_string)
+```
+
 ## Why Separate from CPPLS.jl?
 
 [NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) is kept separate from 
 [CPPLS.jl](https://github.com/oniehuis/CPPLS.jl) even though the two packages share much 
 of the same modelling philosophy. [CPPLS.jl](https://github.com/oniehuis/CPPLS.jl) 
 targets matrix-valued predictors, whereas [NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) 
-targets genuinely multiway predictors and therefore needs different tensor representations, 
+targets genuinely multiway predictors and therefore needs different data representations, 
 multilinear loading-weight routines, and visualization workflows. Keeping the packages 
 separate makes the implementation easier to maintain and the user-facing API easier to 
-understand.
+understand. If both packages are loaded into the same session, be sure to use fully
+qualified names to disambiguate (e.g., `NCPLS.predict` vs. `CPPLS.predict`).
 
 ## Related Packages
 

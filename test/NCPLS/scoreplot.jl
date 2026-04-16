@@ -65,3 +65,15 @@ end
         @test all(length(trace[:x]) == 2 for trace in plt.plot.data)
     end
 end
+
+@testset "scoreplot makie smoke test" begin
+    if !isnothing(Base.find_package("CairoMakie"))
+        @eval using CairoMakie
+
+        mf = mock_scoreplot_fit()
+        fig = NCPLS.scoreplot(mf; backend = :makie)
+
+        @test nameof(typeof(fig)) == :Figure
+        @test length(fig.content) >= 1
+    end
+end

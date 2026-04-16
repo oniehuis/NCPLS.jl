@@ -15,9 +15,15 @@ Requirements
 
 General keywords
 - `backend::Symbol = :plotly`
-  Select the plotting backend. Supported values: `:plotly`.
+  Select the plotting backend. Supported values: `:plotly` and `:makie`.
 """
 function scoreplot end
+
+function scoreplot_makie end
+function scoreplot_makie(args...; kwargs...)
+    _require_scoreplot_extension(:MakieExtension, "Makie or CairoMakie")
+    error("Unreachable")
+end
 
 function scoreplot_plotly end
 function scoreplot_plotly(args...; kwargs...)
@@ -32,6 +38,9 @@ function _require_scoreplot_extension(extsym::Symbol, pkg::AbstractString)
 end
 
 const _require_scoreplot_extension_ref = Ref{Function}(_require_scoreplot_extension)
+const _scoreplot_makie_ref = Ref{Function}(
+    (samples, groups, scores; kwargs...) -> scoreplot_makie(samples, groups, scores; kwargs...)
+)
 const _scoreplot_plotly_ref = Ref{Function}(
     (samples, groups, scores; kwargs...) -> scoreplot_plotly(samples, groups, scores; kwargs...)
 )
@@ -46,6 +55,9 @@ function scoreplot(
     if backend === :plotly
         _require_scoreplot_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
         return _scoreplot_plotly_ref[](samples, groups, scores; kwargs...)
+    elseif backend === :makie
+        _require_scoreplot_extension_ref[](:MakieExtension, "Makie or CairoMakie")
+        return _scoreplot_makie_ref[](samples, groups, scores; kwargs...)
     else
         error("Unknown backend")
     end

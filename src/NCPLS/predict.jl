@@ -9,9 +9,9 @@ Predict the response matrix for each sample in `X` using the fitted NCPLS model.
 result has size `(n_samples, ncomponents, n_responses)`, where slice `[:, a, :]`
 contains the predictions formed from the first `a` components. The result is always
 numeric and always contains the full response block. Even for discriminant or mixed
-response fits, `predict` does not apply an `argmax`; use [`onehot`](@ref),
-[`sampleclasses`](@ref), or [`predictclasses`](@ref) when class labels should be decoded
-from a class-score sub-block.
+response fits, `predict` does not apply an `argmax`; use [`onehot`](@ref) or
+[`predictclasses`](@ref) when class labels should be decoded from a class-score
+sub-block.
 """
 function predict(
     mf::AbstractNCPLSFit,

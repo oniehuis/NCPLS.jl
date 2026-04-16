@@ -122,7 +122,7 @@ end
 
     @test NCPLS.onehot(mf, preds) == expected
     @test NCPLS.onehot(mf, CROSSVAL_X_MATRIX, 2) == expected
-    @test NCPLS.sampleclasses(mf, preds) == NCPLS.responselabels(mf)[NCPLS.sampleclasses(expected)]
+    @test NCPLS.predictclasses(mf, preds) == NCPLS.responselabels(mf)[NCPLS.sampleclasses(expected)]
 end
 
 @testset "classification helpers isolate class columns in mixed response fits" begin
@@ -155,7 +155,7 @@ end
 
     @test NCPLS.onehot(mf, preds) == expected
     @test NCPLS.predictclasses(mf, preds) == ["A", "B", "A", "B"]
-    @test NCPLS.sampleclasses(mf, preds) == ["A", "B", "A", "B"]
+    @test_throws MethodError NCPLS.sampleclasses(mf, preds)
 end
 
 @testset "random_batch_indices builds stratified folds" begin
