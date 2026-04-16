@@ -127,6 +127,10 @@ end
     onehot(mf::AbstractNCPLSFit, predictions::AbstractArray{<:Real, 3})
 
 Convert NCPLS prediction tensors `(samples, components, responses)` into one-hot labels.
+For full `NCPLSFit` objects, NCPLS uses the inferred class-response block only, so mixed
+response fits of the form `[class scores | continuous traits]` are supported. The reduced
+`NCPLSFitLight` fallback uses the full response block and is intended mainly for internal
+cross-validation helpers on pure classification responses.
 """
 function onehot(
     ::AbstractNCPLSFit,
@@ -173,7 +177,8 @@ end
     predictclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
     predictclasses(mf::NCPLSFit, predictions::AbstractArray{<:Real, 3})
 
-Map NCPLS predictions back to class labels using the inferred class-response block.
+Map NCPLS predictions back to class labels using the inferred class-response block. The
+method is a convenience alias for the prediction overload of [`sampleclasses`](@ref).
 """
 function predictclasses(
     mf::NCPLSFit,
@@ -410,7 +415,8 @@ The matrix method expects a one-hot encoded response matrix `Y`; the vector meth
 class labels and converts them internally to one-hot form. Outer and inner folds are
 stratified by class. The return value is the same tuple as [`nestedcv`](@ref): the
 outer-fold classification scores and the selected number of latent variables per outer
-fold.
+fold. Mixed response blocks with additional continuous columns are not supported by this
+helper; use [`nestedcv`](@ref) directly with custom callbacks in that case.
 """
 function cvda(
     X::AbstractArray{<:Real},
@@ -501,7 +507,9 @@ Run a permutation test around nested NCPLS discriminant-analysis cross-validatio
 The matrix method expects a one-hot encoded response matrix `Y`; the vector method
 accepts class labels and converts them internally to one-hot form. The returned vector
 contains one cross-validation score for each permutation and can be compared to the
-observed score from [`cvda`](@ref), for example via [`pvalue`](@ref).
+observed score from [`cvda`](@ref), for example via [`pvalue`](@ref). Mixed response
+blocks with additional continuous columns are not supported by this helper; use
+[`nestedcvperm`](@ref) directly with custom callbacks in that case.
 """
 function permda(
     X::AbstractArray{<:Real},
@@ -764,6 +772,8 @@ end
     outlierscan(X, Y; ...)
 
 Run repeated nested discriminant-analysis CV and count how often each sample is flagged.
+The response must be categorical labels or a pure one-hot class-indicator matrix; mixed
+response blocks with additional continuous columns are not supported here.
 """
 function outlierscan(
     X::AbstractArray{<:Real},

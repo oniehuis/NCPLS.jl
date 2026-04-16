@@ -40,7 +40,11 @@ matrix or vector, `sampleclasses` can be used as grouping metadata. When
 `sampleclasses` and `responselabels` match a one-hot class block in `Yprim`, the fitted
 model also enables class-prediction helpers on that block. When class labels are passed
 positionally as a categorical array, they define the supervised response and are also
-stored as metadata. If `verbose=true`,
+stored as metadata. For custom response matrices this matching is validated as follows:
+if none of the unique `sampleclasses` occur in `responselabels`, no class block is
+inferred and the labels remain metadata only; if only some occur, `fit` throws an error;
+if all occur, each must appear exactly once and the matched response columns must form a
+row-wise consistent one-hot block. If `verbose=true`,
 iteration progress from the PARAFAC step is printed when `m.multilinear` is enabled.
 
 The return value is a `NCPLSFit` containing scores, loadings, regression coefficients,

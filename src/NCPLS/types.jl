@@ -374,7 +374,7 @@ predictoraxes(mf::NCPLSFit) = mf.predictoraxes
 """
     responselabels(mf::NCPLSFit)
 
-Return the stored response labels for the fitted model.
+Return the stored response labels for the fitted model, one label per response column.
 """
 responselabels(mf::NCPLSFit) = mf.responselabels
 
@@ -382,7 +382,9 @@ responselabels(mf::NCPLSFit) = mf.responselabels
     sampleclasses(mf::NCPLSFit)
 
 Return the stored per-sample class labels, or `nothing` when no classes were supplied at
-fit time.
+fit time. These labels live on the sample axis and are stored exactly as supplied. When
+they match response labels and a one-hot class block in a custom response matrix, NCPLS
+also uses them to infer which response columns carry class scores.
 """
 sampleclasses(mf::NCPLSFit) = mf.sampleclasses
 
