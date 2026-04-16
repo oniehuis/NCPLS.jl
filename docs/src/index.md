@@ -1,6 +1,6 @@
 # NCPLS.jl
 
-[`NCPLS.jl`](https://github.com/oniehuis/NCPLS.jl) provides a Julia implementation of the 
+[NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) provides a Julia implementation of the 
 N-way Canonical Partial Least Squares (NCPLS) algorithm, as proposed by Liland et al. 
 (2022), for both regression and discriminant analysis of tensor-valued predictors. This 
 method extends the CPLS approach introduced by Indahl et al. (2009), which was originally 
@@ -34,7 +34,7 @@ resulting fitted models provide prediction, class assignment where a class block
 latent projections, regression coefficients, fitted values, residuals, and labels or 
 metadata retained from model fitting.
 
-[`NCPLS.jl`](https://github.com/oniehuis/NCPLS.jl) also includes helper functionality for 
+[NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) also includes helper functionality for 
 common preprocessing and encoding tasks, including one-hot encoding of class labels and 
 utility functions used in chemometric and multivariate workflows. In addition, the package 
 provides dedicated cross-validation and permutation-testing routines for regression and 
@@ -48,10 +48,10 @@ workflows rely on the more general nested cross-validation functions with custom
 
 ## Why Separate from CPPLS.jl?
 
-[`NCPLS.jl`](https://github.com/oniehuis/NCPLS.jl) is kept separate from 
-[`CPPLS.jl`](https://github.com/oniehuis/CPPLS.jl) even though the two packages share much 
-of the same modelling philosophy. [`CPPLS.jl`](https://github.com/oniehuis/CPPLS.jl) 
-targets matrix-valued predictors, whereas [`NCPLS.jl`](https://github.com/oniehuis/NCPLS.jl) 
+[NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) is kept separate from 
+[CPPLS.jl](https://github.com/oniehuis/CPPLS.jl) even though the two packages share much 
+of the same modelling philosophy. [CPPLS.jl](https://github.com/oniehuis/CPPLS.jl) 
+targets matrix-valued predictors, whereas [NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) 
 targets genuinely multiway predictors and therefore needs different tensor representations, 
 multilinear loading-weight routines, and visualization workflows. Keeping the packages 
 separate makes the implementation easier to maintain and the user-facing API easier to 
@@ -64,7 +64,7 @@ understand.
 
 ## Disclaimer
 
-[`NCPLS.jl`](https://github.com/oniehuis/NCPLS.jl) is provided "as is," without warranty of 
+[NCPLS.jl](https://github.com/oniehuis/NCPLS.jl) is provided "as is," without warranty of 
 any kind. Users are responsible for independently validating all outputs and interpretations 
 and for determining suitability for their specific applications. The authors and 
 contributors disclaim any liability for errors, omissions, or any consequences arising from 
@@ -72,15 +72,15 @@ use of the software, including use in regulated, clinical, or safety-critical co
 
 ## References
 - Indahl UG (2005): A twist to partial least squares regression. *Journal of Chemometrics* 
-  19: 32–44. https://doi.org/10.1002/cem.904.
+  19: 32–44. [DOI](https://doi.org/10.1002/cem.904).
 - Indahl UG, Liland KH, Naes T (2009): Canonical partial least squares — a unified PLS 
   approach to classification and regression problems. *Journal of Chemometrics* 23: 495-504. 
-  https://doi.org/10.1002/cem.1243.
+  [DOI](https://doi.org/10.1002/cem.1243).
 - Liland KH, Indahl UG (2009): Powered partial least squares discriminant analysis. 
-  *Journal of Chemometrics* 23: 7-18. https://doi.org/10.1002/cem.1186.
+  *Journal of Chemometrics* 23: 7-18. [DOI](https://doi.org/10.1002/cem.1186).
 - Liland KH, Indahl UG, Skogholt J, Mishra P (2022): The canonical partial least squares 
   approach to analysing multiway datasets—N-CPLS. *Journal of Chemometrics* 36: e3432. 
-  https://doi.org/10.1002/cem.3432.
+  [DOI](https://doi.org/10.1002/cem.3432).
 - Smit S, van Breemen MJ, Hoefsloot HCJ, Smilde AK, Aerts JMFG, de Koster CG (2007): 
   Assessing the statistical validity of proteomics based biomarkers. *Analytica Chimica 
-  Acta* 592: 210-217. https://doi.org/10.1016/j.aca.2007.04.043.
+  Acta* 592: 210-217. [DOI](https://doi.org/10.1016/j.aca.2007.04.043).
