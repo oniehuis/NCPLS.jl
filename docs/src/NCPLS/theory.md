@@ -60,6 +60,7 @@ The first compression computes the candidate loading weights
 W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
+
 $W_{0,(1)}$ has $p$ rows and $m$ columns. After refolding, it becomes a tensor
 $W_0$ with shape $p_1 \times p_2 \times \cdots \times p_d \times m$, so there is one
 predictor-shaped slice for each response
@@ -130,6 +131,7 @@ Projecting $X$ onto the response-specific directions gives the candidate scores
 ```math
 Z_0 = X_{(1)} W_{0,(1)}.
 ```
+
 
 $Z_0$ has one column per response column in $Y_{\mathrm{comb}}$. CCA is then run between
 $Z_0$ and the current primary-response matrix $Y$. The dominant left canonical weight
@@ -340,6 +342,7 @@ cross-products and as square roots in the CCA row scaling.
 
 ## Additional Responses (`Yadd`)
 
+
 $Y_{\mathrm{add}}$ is for sample-level information that is available during fitting and is related to
 the same latent structure as $Y_{\mathrm{prim}}$, but is not itself a prediction target. A typical
 use case is a low-noise proxy measurement, metadata, or an auxiliary assay available only
@@ -356,6 +359,7 @@ When `Yadd` is present, the following code branches are activated.
    `predict` all use only `Yprim`.
 6. New samples do not need `Yadd`, because the fitted model stores only predictor-side
    objects and primary-response regression coefficients.
+
 
 $Y_{\mathrm{add}}$ can therefore make the first few components more parsimonious when
 $Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information exists. In this package, however, `Yadd` is not
