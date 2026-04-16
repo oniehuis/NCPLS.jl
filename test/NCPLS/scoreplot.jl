@@ -1,5 +1,3 @@
-using CategoricalArrays
-
 function mock_scoreplot_fit(;
     ncomponents=2,
     samplelabels=["s1", "s2", "s3", "s4"],
@@ -74,7 +72,7 @@ end
 
         mf = mock_scoreplot_fit(
             samplelabels = [SubString("a", 1:1), SubString("b", 1:1), SubString("c", 1:1), SubString("d", 1:1)],
-            sampleclasses = categorical(["A", "A", "B", "B"]),
+            sampleclasses = NCPLS.categorical(["A", "A", "B", "B"]),
         )
 
         res = NCPLS.scoreplot(mf; backend = :plotly)
@@ -106,7 +104,7 @@ end
     if !isnothing(Base.find_package("PlotlyJS"))
         @eval using PlotlyJS
 
-        mf = mock_scoreplot_fit(sampleclasses = categorical(["A", "A", "B", "B"]))
+        mf = mock_scoreplot_fit(sampleclasses = NCPLS.categorical(["A", "A", "B", "B"]))
         plt = NCPLS.scoreplot(mf; backend = :plotly)
 
         @test nameof(typeof(plt)) == :SyncPlot
@@ -138,7 +136,7 @@ end
         plot = res isa PlotlyJS.SyncPlot ? res.plot : res
         @test length(plot.data) == 2
 
-        groups_cat = categorical(["x", "y", "x"]; levels = ["x", "y", "z"])
+        groups_cat = NCPLS.categorical(["x", "y", "x"]; levels = ["x", "y", "z"])
         layout = PlotlyJS.Layout(title = "Custom")
         res2 = NCPLS.scoreplot_plotly(
             samples,
@@ -171,7 +169,7 @@ end
         set_backend(missing)
 
         samples = ["s1", "s2", "s3"]
-        groups_cat = categorical(["a", "b", "a"]; levels = ["a", "b", "c"])
+        groups_cat = NCPLS.categorical(["a", "b", "a"]; levels = ["a", "b", "c"])
         scores = [1.0 2.0; 3.0 4.0; 5.0 6.0]
 
         fig1 = Figure(size = (200, 200))
