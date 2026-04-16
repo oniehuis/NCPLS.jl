@@ -24,7 +24,9 @@ loading weights are represented:
 The interpretation of the third positional argument is determined by its type:
 
 1\. `fit(m, X, y::AbstractVector{<:Real})` fits univariate regression.
+
 2\. `fit(m, X, Y::AbstractMatrix{<:Real})` fits a user-defined response block.
+
 3\. `fit(m, X, labels::AbstractCategoricalArray)` fits discriminant analysis by converting
    the labels internally to a one-hot response matrix.
 

@@ -268,7 +268,7 @@ x_{\perp} = x - T(T^\top x).
 This removes the part of $x$ that lies in the span of the previous score vectors and
 keeps only the perpendicular remainder.
 
-### Candidate scores `Z0` on previous scores
+### Candidate scores Z₀ on previous scores
 
 This branch is only used when `Yadd` is present. Before CCA, the package removes from
 each column of $Z_0$ the part that already lies in the span of previous score vectors:
@@ -283,7 +283,7 @@ columns. The manuscript writes the more general projector with
 $(T^\top T)^{-1}$. The package can omit that factor because the stored score matrix $T$
 is already orthonormal.
 
-### Final score `t` on previous scores
+### Final score t on previous scores
 
 This step is always used. Even if `Yadd` is absent, the raw score direction obtained from
 $W$ or $W^\circ$ may still contain parts of earlier components. Orthogonalizing
@@ -297,7 +297,7 @@ This is why later projections can use the simple formula `T * (T' * x)` instead 
 general least-squares projector. It is also what makes the stored component scores easy
 to interpret as separate latent axes.
 
-### Mode weights `w^(j)` on previous mode weights
+### Mode weights w⁽ʲ⁾ on previous mode weights
 
 This step is optional and only exists in the multilinear branch. If
 `orthogonalize_mode_weights = true`, each mode vector is projected away from the
@@ -348,12 +348,17 @@ calibration samples.
 When `Yadd` is present, the following code branches are activated.
 
 1\. The fitting loop forms `Ycomb = hcat(Y, Yadd)`.
+
 2\. `candidate_loading_weights` and `candidate_scores` use `Ycomb`, so the auxiliary
    columns enlarge the supervised search space.
+
 3\. The candidate-score orthogonalization step for $Z_0$ is turned on.
+
 4\. CCA is still performed against the current deflated $Y$, not against `Ycomb`.
+
 5\. The response loading $q$, the deflation step, the regression coefficients, and
    `predict` all use only `Yprim`.
+
 6\. New samples do not need `Yadd`, because the fitted model stores only predictor-side
    objects and primary-response regression coefficients.
 
