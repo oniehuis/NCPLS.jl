@@ -30,20 +30,12 @@ automatically use only the inferred class-response columns.
     fitting, but they are not required for `project`, `predict`, `onehot`, or
     `predictclasses`.
 
-## Quick Start
+## Example Data
 
-The example below reuses the synthetic multilinear dataset introduced on the
-[Fit](fit.md) page. We hold out six samples from each class, fit the models on the
-remaining observations, and then use the fitted objects to:
-
-1\. project the held-out samples into the latent space,
-
-2\. predict class membership for a discriminant model,
-
-3\. predict continuous traits for a regression model, and
-
-4\. decode a mixed response block that contains both class indicators and continuous
-   targets.
+The examples below reuse the synthetic multilinear dataset introduced on the
+[Fit](fit.md) page. We hold out six samples from each class and fit the models on the
+remaining observations, so the same training and hold-out split can be reused across the
+projection, regression, discriminant, and hybrid examples.
 
 ```@example predict_examples
 using NCPLS
@@ -94,10 +86,19 @@ blue, orange = Makie.wong_colors()[[1, 2]]
 nothing # hide
 ```
 
-### Discriminant Analysis
+## Projection
 
-We first fit a discriminant model and project the held-out samples into the score space
-defined by the training data.
+[`project`](@ref) maps new predictor arrays into the latent score space defined by a
+fitted model. Use it when you want latent coordinates for new samples, score plots that
+combine training and hold-out observations, or a projection step before downstream
+interpretation.
+
+```@docs
+NCPLS.project
+```
+
+We first fit a discriminant model and then project the held-out samples into the score
+space defined by the training data.
 
 ```@example predict_examples
 mf_da = fit(
@@ -143,33 +144,17 @@ The returned `heldout_scores` matrix has one row per held-out sample and one col
 latent component. These coordinates live in the same score space as `xscores(mf_da)`, so
 training samples and projected new samples can be plotted together directly.
 
-We can now predict the held-out class labels. The raw output of `predict` remains numeric:
-for a discriminant fit it is a tensor of class scores, not a vector of labels.
+## Predicting Responses
 
-```@example predict_examples
-Yhat_da = predict(mf_da, X_holdout, 2)
-predicted_da = predictclasses(mf_da, Yhat_da)
-tensor_size=size(Yhat_da)
+[`predict`](@ref) returns the cumulative response predictions for the requested number of
+latent components. The return value is always numeric and always contains the full
+response block, even for discriminant or hybrid fits.
+
+```@docs
+NCPLS.predict
 ```
 
-
-```@example predict_examples
-final_class_scores=round.(Yhat_da[1:4, end, :]; digits=3)
-```
-
-
-```@example predict_examples
-hcat(labels_holdout, classes_holdout, predicted_da)
-```
-
-The final requested component slice is `Yhat_da[:, end, :]`. If you prefer one-hot class
-assignments instead of labels, use `onehot(mf_da, Yhat_da)` or the convenience wrapper
-`onehot(mf_da, X_holdout, 2)`.
-
-### Regression
-
-For regression, `predict` works the same way but the response block is interpreted as
-continuous variables rather than class scores.
+For regression, the response block is interpreted as continuous variables.
 
 ```@example predict_examples
 mf_reg = fit(
@@ -220,11 +205,42 @@ nothing # hide
 
 ![](predict_regression_holdout.svg)
 
-Again, the final matrix of predicted responses is the last component slice,
+The final matrix of predicted responses is the last component slice,
 `Yhat_reg[:, end, :]`. Earlier slices show the cumulative prediction after fewer latent
 components.
 
-### Hybrid Response Blocks
+## Decoding Class Predictions
+
+For discriminant models, the raw output of `predict` remains numeric: it is a tensor of
+class scores, not a vector of labels. Use [`onehot`](@ref) when you want a one-hot class
+matrix and [`predictclasses`](@ref) when you want decoded class labels.
+
+```@docs
+NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real}, ::Integer)
+NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3})
+NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real}, ::Integer)
+NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3})
+```
+
+```@example predict_examples
+Yhat_da = predict(mf_da, X_holdout, 2)
+predicted_da = predictclasses(mf_da, Yhat_da)
+tensor_size=size(Yhat_da)
+```
+
+```@example predict_examples
+final_class_scores=round.(Yhat_da[1:4, end, :]; digits=3)
+```
+
+```@example predict_examples
+hcat(labels_holdout, classes_holdout, predicted_da)
+```
+
+The final requested component slice is `Yhat_da[:, end, :]`. If you prefer one-hot class
+assignments instead of labels, use `onehot(mf_da, Yhat_da)` or the convenience wrapper
+`onehot(mf_da, X_holdout, 2)`.
+
+## Hybrid Response Blocks
 
 Mixed response models combine class-indicator columns and continuous targets in a single
 response block. The fitted model still uses `predict` for the full numeric response, but
@@ -281,9 +297,9 @@ decode only the inferred class-response columns.
 
 ## API
 
-```@docs
-NCPLS.onehot
-NCPLS.predict
-NCPLS.predictclasses
-NCPLS.project
-```
+- [`project`](@ref NCPLS.project)
+- [`predict`](@ref StatsAPI.predict)
+- [`onehot(mf, X, ncomps)`](@ref NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real}, ::Integer))
+- [`onehot(mf, predictions)`](@ref NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3}))
+- [`predictclasses(mf, X, ncomps)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real}, ::Integer))
+- [`predictclasses(mf, predictions)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3}))
