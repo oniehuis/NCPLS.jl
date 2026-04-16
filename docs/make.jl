@@ -46,7 +46,8 @@ makedocs(
             "NCPLS/types.md",
             "NCPLS/fit.md",
             "NCPLS/predict.md",
-            "NCPLS/crossvalidation.md"
+            "NCPLS/crossvalidation.md",
+            "NCPLS/visualization.md"
         ],
         "Register" => "register.md",
     ],
