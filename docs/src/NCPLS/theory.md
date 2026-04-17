@@ -37,50 +37,21 @@ $Y_{\mathrm{prim}}$, while $Y_{\mathrm{add}}$ is used as supplied.
 
 ### 1. First supervised compression
 
-If `Yadd === nothing`, the algorithm works only with $Y$. Otherwise it builds the combined
-response block
-
-```math
-Y_{\mathrm{comb}} =
-\begin{cases}
-Y, & \text{if } Y_{\mathrm{add}} \text{ is absent}, \\
-[Y \;\; Y_{\mathrm{add}}], & \text{if } Y_{\mathrm{add}} \text{ is present},
-\end{cases}
-\qquad
-Y_{\mathrm{comb}} \in \mathbb{R}^{n \times m},
-```
-
-Here $q$ is the number of primary-response columns in $Y_{\mathrm{prim}}$, $r$ is the
-number of additional-response columns in $Y_{\mathrm{add}}$, and $m$ is the total number
-of columns currently used in $Y_{\mathrm{comb}}$. Thus $m = q$ when no additional
-responses are used and $m = q + r$ when they are included.
-
-The first compression computes the candidate loading weights
+The first step computes, for each response column currently present in
+$Y_{\mathrm{comb}}$, how strongly each unfolded predictor coordinate covaries with that
+response across the samples. This matrix of candidate loading weights is obtained by
+multiplying the transposed unfolded predictor matrix with the combined response matrix:
 
 ```math
 W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
-The matrix $W_{0,(1)}$ has one row for every unfolded predictor coordinate and one column
-for every response column currently present in $Y_{\mathrm{comb}}$. This unfolded form is
-already sufficient for the next algebraic steps.
-
-To read this column by column, let
-$y_k = Y_{\mathrm{comb}}[:, k] \in \mathbb{R}^n$. Then the $k$th unfolded candidate
-direction is
-
-```math
-w_{0,k} = X_{(1)}^\top y_k \in \mathbb{R}^p,
-```
-
-and its $j$th entry is
-
-```math
-w_{0,jk} = \sum_{i=1}^n x_{ij}\, y_{ik}.
-```
-
-So each predictor position $j$ gets one number that summarizes how that predictor
-coordinate covaries with response column $k$ across the samples:
+The resulting matrix $W_{0,(1)}$ has one row for every unfolded predictor coordinate and one column
+for every response column currently present in $Y_{\mathrm{comb}}$. Its entries are
+proportional to cross-covariances between unfolded predictor coordinates and response
+columns; if observation weights are used, the same weighted cross-covariance logic
+applies. Hence each predictor position $j$ gets one number that summarizes how that
+predictor coordinate covaries with response column $k$ across the samples:
 
 - large positive values mean that samples with large positive $y_{ik}$ tend also to have
   large positive predictor values at coordinate $j$,
@@ -92,102 +63,26 @@ This is why the result is already a direction in predictor space: it has one coe
 for every unfolded predictor coordinate. It is not yet the final component direction, but
 it is a response-specific candidate direction.
 
-For a tiny two-predictor example, suppose one response column is
-
-```math
-y_k = \begin{bmatrix} 1 \\ 1 \\ -1 \\ -1 \end{bmatrix},
-```
-
-and the corresponding unfolded sample vectors are
-
-```math
-x_1 = \begin{bmatrix} 2 \\ 1 \end{bmatrix},
-\quad
-x_2 = \begin{bmatrix} 1 \\ 2 \end{bmatrix},
-\quad
-x_3 = \begin{bmatrix} -2 \\ -1 \end{bmatrix},
-\quad
-x_4 = \begin{bmatrix} -1 \\ -2 \end{bmatrix}.
-```
-
-Then
-
-```math
-w_{0,k}
-=
-X_{(1)}^\top y_k
-=
-x_1 + x_2 - x_3 - x_4
-=
-\begin{bmatrix} 6 \\ 6 \end{bmatrix}.
-```
-
-So the candidate direction points along $(1, 1)$: toward the predictor pattern that is
-large for the positive-response samples and small for the negative-response samples. In
-higher dimensions exactly the same logic applies, except that the direction has one entry
-for every predictor coordinate in the unfolding.
-
-This is the key point behind the "first compression": it does not yet produce the final
-component. It produces one predictor-side direction per response column. When $X$ and the
-corresponding response column are centered, each entry is proportional to a
-cross-covariance between one predictor position and that response. The factor
-$1/(n-1)$ is omitted because only the direction matters. So this object is not a full
-covariance matrix. It is a predictor-shaped direction for each response column.
-
-The same formula also explains why constant response offsets are often irrelevant for
-component extraction. If $X$ is centered along the sample mode, then
-
-```math
-X_{(1)}^\top \mathbf{1} = 0.
-```
-
-Therefore adding a constant offset to any column of $Y_{\mathrm{comb}}$ does not change
-$W_{0,(1)}$. Under the default centered-$X$ workflow, constant shifts in
-$Y_{\mathrm{prim}}$ or $Y_{\mathrm{add}}$ typically do not change the latent directions.
-For $Y_{\mathrm{prim}}$, they still matter for
-prediction because the mean response must be restored afterwards.
-
-If there is only one response column, there is only one such slice. After the later
-collapse by the canonical vector $c$, the result is simply one predictor-side
-vector/matrix/tensor for the current component.
-
-A useful shape summary is
-
-```math
-\begin{aligned}
-X_{(1)} &\in \mathbb{R}^{n \times p},
-&
-Y_{\mathrm{comb}} &\in \mathbb{R}^{n \times m},
-\\
-W_{0,(1)} &= X_{(1)}^\top Y_{\mathrm{comb}}
-&
-&\in \mathbb{R}^{p \times m},
-\\
-Z_0 &= X_{(1)} W_{0,(1)}
-&
-&\in \mathbb{R}^{n \times m},
-\\
-c &= \text{dominant left canonical weight from } \mathrm{CCA}(Z_0, Y)
-&
-&\in \mathbb{R}^{m \times 1},
-\\
-W_{(1)} &= W_{0,(1)} c
-&
-&\in \mathbb{R}^{p \times 1}.
-\end{aligned}
-```
-
-### 2. Canonical combination
-
-Projecting $X$ onto the response-specific directions gives the candidate scores
+Projecting the unfolded predictor matrix onto these response-specific candidate
+directions gives the candidate scores
 
 ```math
 Z_0 = X_{(1)} W_{0,(1)}.
 ```
 
-The matrix $Z_0$ has one column per response column in $Y_{\mathrm{comb}}$. CCA is then run between $Z_0$ and the current primary-response matrix $Y$. The dominant left canonical 
-weight vector tells us how to combine the columns of $Z_0$ so that the resulting linear
-combination is maximally correlated with $Y$.
+The matrix $Z_0$ has one column per response column in $Y_{\mathrm{comb}}$. Entry
+$(i, k)$ is therefore the score of sample $i$ on the candidate predictor direction
+associated with response column $k$. Thus $Z_0$ is a compressed, response-guided
+representation of $X_{(1)}$: for each sample and each response column, all unfolded
+predictor coordinates are summarized by one value.
+
+### 2. Canonical combination
+
+In the second step, canonical correlation analysis (CCA) is applied to $Z_0$ and the
+current primary-response matrix $Y$. This yields a dominant canonical weight vector
+$c$ on the $Z_0$ side. The vector $c$ tells us how to combine the columns of $Z_0$ so
+that the resulting linear combination is maximally correlated with a corresponding linear
+combination of the columns of $Y$.
 
 ```math
 c
@@ -195,12 +90,16 @@ c
 \text{first left canonical weight vector from }
 \mathrm{CCA}(Z_0, Y),
 \qquad
-W_{(1)} = W_{0,(1)} c.
 ```
 
-This is why $c$ is a vector: it only needs one coefficient per column of $Z_0$. The
-product $W_0 c$ collapses the response dimension and returns one predictor-side weight
-object $W$ for the current component.
+The weight vector $c$ stores one coefficient for every column of $Z_0$. Because those
+columns were obtained from the corresponding columns of $W_{0,(1)}$, the same
+coefficients can be used to collapse the candidate loading weights back to one predictor
+direction in unfolded $X$ space:
+
+```math
+W_{(1)} = W_{0,(1)} c.
+```
 
 ### 3. Optional multilinear compression
 
