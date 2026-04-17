@@ -77,10 +77,31 @@ $(j, k)$ entry is
 w_{0,jk} = \sum_{i=1}^n x_{ij} y_{\mathrm{comb},ik},
 ```
 
-or the corresponding weighted sum if observation weights are used. Under the default
-centering of $X$ and $Y_{\mathrm{prim}}$, these entries are proportional to
-cross-covariances. More generally, they summarize how predictor coordinate $j$ and
-response column $k$ vary together across the samples:
+or the corresponding weighted sum if observation weights are used. They are called
+proportional to cross-covariances, rather than cross-covariances themselves, because the
+usual covariance normalization factor is not included. If $x_j$ and the relevant
+response column are centered, then
+
+```math
+w_{0,jk} = \sum_{i=1}^n x_{ij} y_{\mathrm{comb},ik}
+```
+
+is equal to $n$ times the covariance under the population convention, or $(n-1)$ times
+the covariance under the sample convention. For weighted data, the corresponding weighted
+normalization factor is likewise omitted. Columns from $Y_{\mathrm{add}}$ are used as
+supplied, but under the default centering of $X$ a constant offset in such a column drops
+out automatically, because
+
+```math
+X_{(1)}^\top (y + \alpha \mathbf{1}) = X_{(1)}^\top y
+```
+
+when the columns of $X_{(1)}$ are centered. Thus a predictor direction can still be
+inferred: multiplying by any non-constant response vector produces a vector of predictor
+coefficients. If $X$ is not centered, however, the result should be interpreted more
+generally as a raw association direction rather than strictly as a covariance direction.
+More generally, these entries summarize how predictor coordinate $j$ and response column
+$k$ vary together across the samples:
 
 - large positive values mean that samples with large positive
   $y_{\mathrm{comb},ik}$ tend also to have
