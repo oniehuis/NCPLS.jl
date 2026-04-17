@@ -4,12 +4,13 @@ N-way Canonical Partial Least Squares (N-CPLS) extracts supervised latent compon
 a predictor array
 $X \in \mathbb{R}^{n \times p_1 \times \cdots \times p_d}$ and a primary-response matrix
 $Y_{\mathrm{prim}} \in \mathbb{R}^{n \times q}$. Optional additional responses
-$Y_{\mathrm{add}} \in \mathbb{R}^{n \times r}$ can help choose the components, but only
-$Y_{\mathrm{prim}}$ is predicted.
+$Y_{\mathrm{add}} \in \mathbb{R}^{n \times r}$ may contribute to component extraction,
+but only $Y_{\mathrm{prim}}$ is deflated and predicted.
 
-The paper by Liland et al. presents the method mainly in tensor notation. For
-understanding the algorithm, it is often easier to first unfold the predictor array along
-the sample mode. Let
+The method was introduced by Liland et al. (2022). The paper formulates N-CPLS as a
+multiway extension of canonical PLS, but in the present implementation most of the
+algebra is carried out on the mode-1 unfolding of the predictor tensor. This gives a
+matrix in which each sample tensor is stacked into one row:
 
 ```math
 X_{(1)} \in \mathbb{R}^{n \times p},
@@ -17,25 +18,22 @@ X_{(1)} \in \mathbb{R}^{n \times p},
 p = \prod_{j=1}^d p_j,
 ```
 
-be the matrix obtained by stacking each sample tensor into one row. In that view, each
-component step becomes an ordinary matrix calculation, followed optionally by a
-multilinear rank-1 approximation.
+In that unfolded view, most per-component operations become ordinary matrix calculations.
+If the multilinear branch is enabled (default), the collapsed predictor-side weight object
+is then compressed to a rank-1 multilinear form to recover the multiway interpretation. In
+the unfolded branch, that compression step is skipped.
 
-**Implementation note.** The package preprocesses `X` and `Yprim` according to the model
-settings. By default, `Yprim` is centered and its mean is added back during prediction.
-When `X` is also centered along the sample mode, this centering of `Yprim` usually does
-not change the extracted latent directions; it mainly ensures that the response intercept
-is handled automatically. `Yadd`, in contrast, is only converted to `Float64` and
-validated for size. It is not centered or scaled automatically.
+## Main Algorithmic Steps
 
-Below, $Y$ denotes the current deflated working copy of the preprocessed primary-response
-matrix. At the start of fitting, $Y$ equals the preprocessed $Y_{\mathrm{prim}}$.
+Each component is built in four steps: inference of response-specific predictor
+directions, selection of the optimal linear combination of these directions by CCA,
+optional compression of the resulting predictor-side weight object to a multilinear
+rank-1 form, and extraction of an orthogonal score vector.
 
-## Basic Introduction
-
-Each component is built from four ideas: create response-specific predictor directions,
-combine them with CCA, optionally compress them to a multilinear rank-1 form, and extract
-an orthogonal score vector.
+Below, $X$ denotes the preprocessed predictor tensor and $Y$ denotes the current deflated
+working copy of the preprocessed primary-response matrix. At the start of fitting,
+$Y = Y_{\mathrm{prim}}$. Under the default settings this means centered $X$ and centered
+$Y_{\mathrm{prim}}$, while $Y_{\mathrm{add}}$ is used as supplied.
 
 ### 1. First supervised compression
 
@@ -60,18 +58,81 @@ The first compression computes the candidate loading weights
 W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
-The matrix $W_{0,(1)}$ has $p$ rows and $m$ columns. After refolding, it becomes a tensor
+The matrix $W_{0,(1)}$ has $p$ rows and $m$ columns. This unfolded form is already
+sufficient for the next algebraic steps. If one wants to recover the multiway predictor
+shape for interpretation, $W_{0,(1)}$ can be refolded to a tensor
 $W_0$ with shape $p_1 \times p_2 \times \cdots \times p_d \times m$, so there is one
-predictor-shaped slice for each response
-column.
+predictor-shaped slice for each response column.
 
-For a fixed response column $k$, the corresponding slice is
+If one does refold, then for a fixed response column $k$ the corresponding slice is
 
 ```math
 W_{0,:,\ldots,:,k}
 =
 \sum_{i=1}^n y_{\mathrm{comb},ik}\, X_{i,:,:,\ldots,:}.
 ```
+
+A useful way to read this is column by column. Let
+$y_k = Y_{\mathrm{comb}}[:, k] \in \mathbb{R}^n$. Then the $k$th unfolded candidate
+direction is
+
+```math
+w_{0,k} = X_{(1)}^\top y_k \in \mathbb{R}^p,
+```
+
+and its $j$th entry is
+
+```math
+w_{0,jk} = \sum_{i=1}^n x_{ij}\, y_{ik}.
+```
+
+So each predictor position $j$ gets one number that summarizes how that predictor
+coordinate covaries with response column $k$ across the samples:
+
+- large positive values mean that samples with large positive $y_{ik}$ tend also to have
+  large positive predictor values at coordinate $j$,
+- large negative values mean the relation tends to go in the opposite direction,
+- values near zero mean that this predictor coordinate contributes little to that
+  response-specific direction.
+
+This is why the result is already a direction in predictor space: it has one coefficient
+for every unfolded predictor coordinate. It is not yet the final component direction, but
+it is a response-specific candidate direction.
+
+For a tiny two-predictor example, suppose one response column is
+
+```math
+y_k = \begin{bmatrix} 1 \\ 1 \\ -1 \\ -1 \end{bmatrix},
+```
+
+and the corresponding unfolded sample vectors are
+
+```math
+x_1 = \begin{bmatrix} 2 \\ 1 \end{bmatrix},
+\quad
+x_2 = \begin{bmatrix} 1 \\ 2 \end{bmatrix},
+\quad
+x_3 = \begin{bmatrix} -2 \\ -1 \end{bmatrix},
+\quad
+x_4 = \begin{bmatrix} -1 \\ -2 \end{bmatrix}.
+```
+
+Then
+
+```math
+w_{0,k}
+=
+X_{(1)}^\top y_k
+=
+x_1 + x_2 - x_3 - x_4
+=
+\begin{bmatrix} 6 \\ 6 \end{bmatrix}.
+```
+
+So the candidate direction points along $(1, 1)$: toward the predictor pattern that is
+large for the positive-response samples and small for the negative-response samples. In
+higher dimensions exactly the same logic applies, except that the direction has one entry
+for every predictor coordinate in the unfolding.
 
 This is the key point behind the "first compression": it does not yet produce the final
 component. It produces one predictor-side direction per response column. When $X$ and the
