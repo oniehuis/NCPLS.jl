@@ -100,9 +100,9 @@ Z_0 = X_{(1)} W_{0,(1)}.
 
 The resulting candidate score matrix $Z_0$ has one row per sample and one column per
 response column in $Y_{\mathrm{comb}}$. Entry $(i, k)$ is the score of sample $i$ on the
-candidate predictor direction associated with response column $k$. Thus, $Z_0$ is a
-compressed, response-guided representation of $X_{(1)}$: for each sample and each
-response column, all unfolded predictor coordinates are summarized by one value.
+candidate predictor direction associated with response column $k$. $Z_0$ can thus beee seen 
+as a compressed, response-guided representation of $X_{(1)}$ in which for each sample and 
+each response column, all unfolded predictor coordinates are summarized by a single value.
 
 ### 2. Canonical combination
 
@@ -120,36 +120,15 @@ c
 \qquad
 ```
 
-The weight vector $c$ stores one coefficient for every column of $Z_0$. Because those
-columns were obtained from the corresponding candidate directions in $W_{0,(1)}$, the
-same coefficients can be used to combine those candidate directions into one single
-predictor direction:
+The weight vector $c$ stores one coefficient for every column of $Z_0$. These coefficients 
+can be combined with the candidate directions into one single predictor direction:
 
 ```math
 W_{(1)} = W_{0,(1)} c.
 ```
 
-This is a vector in unfolded predictor space simply because of its dimensions. If
-$W_{0,(1)} \in \mathbb{R}^{p \times m}$ and $c \in \mathbb{R}^m$, then
-$W_{(1)} \in \mathbb{R}^p$. Since the unfolded predictor matrix
-$X_{(1)} \in \mathbb{R}^{n \times p}$ has $p$ columns, a vector of length $p$ assigns one
-coefficient to each unfolded predictor coordinate. That is exactly what is meant by a
-direction in unfolded $X$ space.
-
-Entrywise, the $j$th coefficient of $W_{(1)}$ is
-
-```math
-w_j = \sum_{k=1}^m w_{0,jk} c_k.
-```
-
 So each predictor coordinate receives a single combined weight obtained by adding its
 response-specific candidate weights, weighted by the CCA coefficients in $c$.
-
-The same point can be seen directly from the score combination:
-
-```math
-z = Z_0 c = X_{(1)} W_{0,(1)} c = X_{(1)} W_{(1)}.
-```
 
 Thus, combining the candidate score columns by $c$ is equivalent to projecting
 $X_{(1)}$ onto one combined predictor direction $W_{(1)}$.
