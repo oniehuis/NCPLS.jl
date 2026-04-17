@@ -50,7 +50,10 @@ Y, & \text{if } Y_{\mathrm{add}} \text{ is absent}, \\
 Y_{\mathrm{comb}} \in \mathbb{R}^{n \times m},
 ```
 
-with $m = q$ or $m = q + r$, respectively.
+Here $q$ is the number of primary-response columns in $Y_{\mathrm{prim}}$, $r$ is the
+number of additional-response columns in $Y_{\mathrm{add}}$, and $m$ is the total number
+of columns currently used in $Y_{\mathrm{comb}}$. Thus $m = q$ when no additional
+responses are used and $m = q + r$ when they are included.
 
 The first compression computes the candidate loading weights
 
@@ -58,21 +61,11 @@ The first compression computes the candidate loading weights
 W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
-The matrix $W_{0,(1)}$ has $p$ rows and $m$ columns. This unfolded form is already
-sufficient for the next algebraic steps. If one wants to recover the multiway predictor
-shape for interpretation, $W_{0,(1)}$ can be refolded to a tensor
-$W_0$ with shape $p_1 \times p_2 \times \cdots \times p_d \times m$, so there is one
-predictor-shaped slice for each response column.
+The matrix $W_{0,(1)}$ has one row for every unfolded predictor coordinate and one column
+for every response column currently present in $Y_{\mathrm{comb}}$. This unfolded form is
+already sufficient for the next algebraic steps.
 
-If one does refold, then for a fixed response column $k$ the corresponding slice is
-
-```math
-W_{0,:,\ldots,:,k}
-=
-\sum_{i=1}^n y_{\mathrm{comb},ik}\, X_{i,:,:,\ldots,:}.
-```
-
-A useful way to read this is column by column. Let
+To read this column by column, let
 $y_k = Y_{\mathrm{comb}}[:, k] \in \mathbb{R}^n$. Then the $k$th unfolded candidate
 direction is
 
