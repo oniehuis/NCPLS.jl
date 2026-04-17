@@ -1,16 +1,24 @@
 # Theory
 
 N-way Canonical Partial Least Squares (N-CPLS) extracts supervised latent components from
-a predictor array
+a predictor tensor
 $X \in \mathbb{R}^{n \times p_1 \times \cdots \times p_d}$ and a primary-response matrix
-$Y_{\mathrm{prim}} \in \mathbb{R}^{n \times q}$. Optional additional responses
+$Y_{\mathrm{prim}} \in \mathbb{R}^{n \times q}$. Depending on the structure of
+$Y_{\mathrm{prim}}$, the method can be used for regression, discriminant analysis, or a
+combination of both. Optional additional responses
 $Y_{\mathrm{add}} \in \mathbb{R}^{n \times r}$ may contribute to component extraction,
-but only $Y_{\mathrm{prim}}$ is deflated and predicted.
+but only $Y_{\mathrm{prim}}$ is deflated during fitting and predicted afterward.
 
-The method was introduced by Liland et al. (2022). The paper formulates N-CPLS as a
-multiway extension of canonical PLS, but in the present implementation most of the
-algebra is carried out on the mode-1 unfolding of the predictor tensor. This gives a
-matrix in which each sample tensor is stacked into one row:
+The method was introduced by Liland et al. (2022). It is designed for settings in which
+the predictor space is large relative to the number of samples and predictor variables may
+show substantial collinearity, so that coefficient estimation by ordinary regression
+methods would be unstable or impossible.
+
+The paper formulates N-CPLS as a multiway extension of canonical PLS. Below, the method
+is explained mainly in terms of the mode-1 unfolding of the predictor tensor, because
+that two-dimensional representation is easier to visualize and usually easier to follow
+than the full multiway notation. The matrix in which each sample tensor is stacked into
+one row is
 
 ```math
 X_{(1)} \in \mathbb{R}^{n \times p},
@@ -18,63 +26,83 @@ X_{(1)} \in \mathbb{R}^{n \times p},
 p = \prod_{j=1}^d p_j,
 ```
 
-In that unfolded view, most per-component operations become ordinary matrix calculations.
-If the multilinear branch is enabled (default), the collapsed predictor-side weight object
-is then compressed to a rank-1 multilinear form to recover the multiway interpretation. In
-the unfolded branch, that compression step is skipped.
+If the multilinear branch of the algorithm is enabled (default), the collapsed
+predictor-side weight object obtained from the unfolded calculations is not kept as an
+independent weight for every unfolded predictor coordinate. Instead, it is approximated by
+one weight vector for each predictor mode. For a $d$-way predictor tensor, this means that
+mode-specific vectors
+$w^{(1)} \in \mathbb{R}^{p_1}, \ldots, w^{(d)} \in \mathbb{R}^{p_d}$ are estimated, and
+the weight assigned to predictor coordinate $(j_1, \ldots, j_d)$ is then reconstructed
+from their outer product:
+
+```math
+W_{j_1,\ldots,j_d} \approx w^{(1)}_{j_1} w^{(2)}_{j_2} \cdots w^{(d)}_{j_d},
+```
+
+up to an overall scaling factor. Thus, the multilinear branch replaces a separate
+coefficient for every possible predictor coordinate by a structured rank-1 approximation
+assembled from mode-wise weights. If the unfolded branch is used instead, that
+compression step is skipped and the coordinate-wise weight object is kept directly.
 
 ## Main Algorithmic Steps
 
 Each component is built in four steps: inference of response-specific predictor
 directions, selection of the optimal linear combination of these directions by CCA,
 optional compression of the resulting predictor-side weight object to a multilinear
-rank-1 form, and extraction of an orthogonal score vector.
-
-Below, $X$ denotes the preprocessed predictor tensor and $Y$ denotes the current deflated
+rank-1 form, and extraction of an orthogonal score vector. In the description below,
+$X$ denotes the preprocessed predictor tensor and $Y$ denotes the current deflated
 working copy of the preprocessed primary-response matrix. At the start of fitting,
-$Y = Y_{\mathrm{prim}}$. Under the default settings this means centered $X$ and centered
-$Y_{\mathrm{prim}}$, while $Y_{\mathrm{add}}$ is used as supplied.
+$Y = Y_{\mathrm{prim}}$. Under the default settings, this means centered $X$ and centered
+$Y_{\mathrm{prim}}$, while $Y_{\mathrm{add}}$, if present, is used as supplied.
 
 ### 1. First supervised compression
 
-The first step computes, for each response column currently present in
-$Y_{\mathrm{comb}}$, how strongly each unfolded predictor coordinate covaries with that
-response across the samples. This matrix of candidate loading weights is obtained by
-multiplying the transposed unfolded predictor matrix with the combined response matrix:
+The first step constructs one candidate predictor direction for each response column in
+the combined response matrix
+$Y_{\mathrm{comb}} = Y$ or $Y_{\mathrm{comb}} = [Y \; Y_{\mathrm{add}}]$, depending on
+whether additional responses are present. These candidate directions are collected in the
+matrix of candidate loading weights
+$W_{0,(1)}$, obtained by multiplying the transposed unfolded predictor matrix with
+$Y_{\mathrm{comb}}$:
 
 ```math
 W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
-The resulting matrix $W_{0,(1)}$ has one row for every unfolded predictor coordinate and one column
-for every response column currently present in $Y_{\mathrm{comb}}$. Its entries are
-proportional to cross-covariances between unfolded predictor coordinates and response
-columns; if observation weights are used, the same weighted cross-covariance logic
-applies. Hence each predictor position $j$ gets one number that summarizes how that
-predictor coordinate covaries with response column $k$ across the samples:
+The resulting matrix $W_{0,(1)}$ has one row for every column of the unfolded predictor
+matrix $X_{(1)}$ and one column for every column of $Y_{\mathrm{comb}}$. Its
+$(j, k)$ entry is
 
-- large positive values mean that samples with large positive $y_{ik}$ tend also to have
+```math
+w_{0,jk} = \sum_{i=1}^n x_{ij} y_{\mathrm{comb},ik},
+```
+
+or the corresponding weighted sum if observation weights are used. Under the default
+centering of $X$ and $Y_{\mathrm{prim}}$, these entries are proportional to
+cross-covariances. More generally, they summarize how predictor coordinate $j$ and
+response column $k$ vary together across the samples:
+
+- large positive values mean that samples with large positive
+  $y_{\mathrm{comb},ik}$ tend also to have
   large positive predictor values at coordinate $j$,
 - large negative values mean the relation tends to go in the opposite direction,
 - values near zero mean that this predictor coordinate contributes little to that
   response-specific direction.
 
-This is why the result is already a direction in predictor space: it has one coefficient
-for every unfolded predictor coordinate. It is not yet the final component direction, but
-it is a response-specific candidate direction.
-
-Projecting the unfolded predictor matrix onto these response-specific candidate
-directions gives the candidate scores
+The $k$th column of $W_{0,(1)}$ therefore contains one coefficient for every column of
+$X_{(1)}$ and can be read as a response-specific direction in unfolded predictor space.
+Projecting the unfolded predictor matrix onto these candidate directions gives the
+candidate scores
 
 ```math
 Z_0 = X_{(1)} W_{0,(1)}.
 ```
 
-The matrix $Z_0$ has one column per response column in $Y_{\mathrm{comb}}$. Entry
-$(i, k)$ is therefore the score of sample $i$ on the candidate predictor direction
-associated with response column $k$. Thus $Z_0$ is a compressed, response-guided
-representation of $X_{(1)}$: for each sample and each response column, all unfolded
-predictor coordinates are summarized by one value.
+The resulting candidate score matrix $Z_0$ has one row per sample and one column per
+response column in $Y_{\mathrm{comb}}$. Entry $(i, k)$ is the score of sample $i$ on the
+candidate predictor direction associated with response column $k$. Thus, $Z_0$ is a
+compressed, response-guided representation of $X_{(1)}$: for each sample and each
+response column, all unfolded predictor coordinates are summarized by one value.
 
 ### 2. Canonical combination
 
@@ -93,13 +121,38 @@ c
 ```
 
 The weight vector $c$ stores one coefficient for every column of $Z_0$. Because those
-columns were obtained from the corresponding columns of $W_{0,(1)}$, the same
-coefficients can be used to collapse the candidate loading weights back to one predictor
-direction in unfolded $X$ space:
+columns were obtained from the corresponding candidate directions in $W_{0,(1)}$, the
+same coefficients can be used to combine those candidate directions into one single
+predictor direction:
 
 ```math
 W_{(1)} = W_{0,(1)} c.
 ```
+
+This is a vector in unfolded predictor space simply because of its dimensions. If
+$W_{0,(1)} \in \mathbb{R}^{p \times m}$ and $c \in \mathbb{R}^m$, then
+$W_{(1)} \in \mathbb{R}^p$. Since the unfolded predictor matrix
+$X_{(1)} \in \mathbb{R}^{n \times p}$ has $p$ columns, a vector of length $p$ assigns one
+coefficient to each unfolded predictor coordinate. That is exactly what is meant by a
+direction in unfolded $X$ space.
+
+Entrywise, the $j$th coefficient of $W_{(1)}$ is
+
+```math
+w_j = \sum_{k=1}^m w_{0,jk} c_k.
+```
+
+So each predictor coordinate receives a single combined weight obtained by adding its
+response-specific candidate weights, weighted by the CCA coefficients in $c$.
+
+The same point can be seen directly from the score combination:
+
+```math
+z = Z_0 c = X_{(1)} W_{0,(1)} c = X_{(1)} W_{(1)}.
+```
+
+Thus, combining the candidate score columns by $c$ is equivalent to projecting
+$X_{(1)}$ onto one combined predictor direction $W_{(1)}$.
 
 ### 3. Optional multilinear compression
 
