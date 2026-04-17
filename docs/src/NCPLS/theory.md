@@ -108,9 +108,9 @@ each response column, all unfolded predictor coordinates are summarized by a sin
 
 In the second step, canonical correlation analysis (CCA) is applied to $Z_0$ and the
 current primary-response matrix $Y$. This yields a dominant canonical weight vector
-$c$ on the $Z_0$ side. The vector $c$ tells us how to combine the columns of $Z_0$ so
-that the resulting linear combination is maximally correlated with a corresponding linear
-combination of the columns of $Y$.
+$c$ on the $Z_0$ side. The entries of $c$ tell us how to linearly combine the columns of
+$Z_0$ so that the resulting score vector is maximally correlated with a corresponding
+linear combination of the columns of $Y$.
 
 ```math
 c
@@ -120,18 +120,29 @@ c
 \qquad
 ```
 
-The weight vector $c$ stores one coefficient for every column of $Z_0$. These coefficients 
-can be combined with the candidate directions into one single predictor direction:
+The weight vector $c$ stores one coefficient for every column of $Z_0$. The same
+coefficients are then used to combine the corresponding candidate predictor vectors in
+$W_{0,(1)}$ into one single predictor vector:
 
 ```math
 W_{(1)} = W_{0,(1)} c.
 ```
 
-So each predictor coordinate receives a single combined weight obtained by adding its
-response-specific candidate weights, weighted by the CCA coefficients in $c$.
+Entrywise, this means
+
+```math
+w_j = \sum_{k=1}^m w_{0,jk} c_k,
+```
+
+so each unfolded predictor coordinate receives one combined weight obtained from its
+response-specific candidate weights and the CCA coefficients in $c$.
 
 Thus, combining the candidate score columns by $c$ is equivalent to projecting
-$X_{(1)}$ onto one combined predictor direction $W_{(1)}$.
+$X_{(1)}$ onto one combined predictor vector:
+
+```math
+z = Z_0 c = X_{(1)} W_{(1)}.
+```
 
 ### 3. Optional multilinear compression
 
