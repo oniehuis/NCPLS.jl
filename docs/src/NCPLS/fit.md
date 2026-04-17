@@ -65,7 +65,7 @@ The additional switch `orthogonalize_mode_weights=true` is only relevant when
 across components. This can make multilinear weight profiles easier to compare, but it is
 also a stricter model assumption and is therefore not the default.
 
-## Quick Start
+## Example Data
 
 The synthetic dataset used below supports all three fitting styles: discriminant
 analysis, regression, and hybrid response modeling.
@@ -371,6 +371,66 @@ NCPLSModel(ncomponents=2, multilinear=true,  orthogonalize_mode_weights=true)
 The first keeps fully unfolded predictor-side weights. The second uses multilinear rank-1
 compression without additional orthogonality constraints. The third adds orthogonality of
 the stored mode vectors across components.
+
+One direct way to see the effect of the `multilinear` switch is to compare the final
+coefficient landscape for the same response under the unfolded and multilinear fits. The
+response is unchanged, so any difference in the plotted surface comes from the
+predictor-side representation rather than from a different supervision target.
+
+```@example fit_examples
+B_trait1_unfolded = coefficientlandscape(mf_reg_unfolded; response=1)
+B_trait1_multilinear = coefficientlandscape(mf_reg; response=1)
+coef_compare_lim = maximum(abs.(vcat(vec(B_trait1_unfolded), vec(B_trait1_multilinear))))
+
+fig_coef_compare = Figure(size=(1200, 500))
+
+ax_b_unfolded = Axis(
+    fig_coef_compare[1, 1],
+    title="$(data.responselabels_reg[1]): unfolded",
+    xlabel=rt_axis.name,
+    ylabel=mz_axis.name,
+)
+heatmap!(
+    ax_b_unfolded,
+    rt_axis.values,
+    mz_axis.values,
+    B_trait1_unfolded;
+    colormap=:RdBu,
+    colorrange=(-coef_compare_lim, coef_compare_lim),
+)
+
+ax_b_multilinear = Axis(
+    fig_coef_compare[1, 2],
+    title="$(data.responselabels_reg[1]): multilinear",
+    xlabel=rt_axis.name,
+    ylabel=mz_axis.name,
+)
+heatmap!(
+    ax_b_multilinear,
+    rt_axis.values,
+    mz_axis.values,
+    B_trait1_multilinear;
+    colormap=:RdBu,
+    colorrange=(-coef_compare_lim, coef_compare_lim),
+)
+
+Colorbar(
+    fig_coef_compare[1, 3],
+    limits=(-coef_compare_lim, coef_compare_lim),
+    colormap=:RdBu,
+    label="Coefficient",
+)
+
+save("fit_coefflandscape_multilinear_vs_unfolded.svg", fig_coef_compare)
+nothing # hide
+```
+
+![](fit_coefflandscape_multilinear_vs_unfolded.svg)
+
+This comparison makes the tradeoff more concrete. The unfolded branch is free to place
+coefficient structure anywhere on the full RT-by-m/z surface. The multilinear branch has
+to build that fitted surface from rank-1 component terms, so the same response can end
+up with a visibly more constrained coefficient pattern.
 
 ```@example fit_examples
 mf_reg_multilinear_orth = fit(
