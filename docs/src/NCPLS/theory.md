@@ -7,7 +7,7 @@ $Y_{\mathrm{prim}} \in \mathbb{R}^{n \times q}$. Depending on the structure of
 $Y_{\mathrm{prim}}$, the method can be used for regression, discriminant analysis, or a
 combination of both. Optional additional responses
 $Y_{\mathrm{add}} \in \mathbb{R}^{n \times r}$ may contribute to component extraction,
-but only $Y_{\mathrm{prim}}$ is deflated during fitting and predicted afterward.
+but only $Y_{\mathrm{prim}}$ is predicted afterward.
 
 The method was introduced by Liland et al. (2022). It is designed for settings in which
 the predictor space is large relative to the number of samples and predictor variables may
@@ -121,7 +121,7 @@ Z_0 = X_{(1)} W_{0,(1)}.
 
 The resulting candidate score matrix $Z_0$ has one row per sample and one column per
 response column in $Y_{\mathrm{comb}}$. Entry $(i, k)$ is the score of sample $i$ on the
-candidate predictor direction associated with response column $k$. $Z_0$ can thus beee seen 
+candidate predictor direction associated with response column $k$. $Z_0$ can thus be seen 
 as a compressed, response-guided representation of $X_{(1)}$ in which for each sample and 
 each response column, all unfolded predictor coordinates are summarized by a single value.
 
@@ -219,6 +219,8 @@ flexible.
 
 ### 4. Score, loadings, and deflation
 
+### 4. Score, loadings, and deflation
+
 The actual component score is obtained by projecting each sample onto the final
 predictor-side weight object. In the multilinear branch this object is $W^\circ$; in the
 unfolded branch it is simply $W$. Using $W^\circ$ to denote the final object passed to the
@@ -228,46 +230,154 @@ score calculation, the projection is, in unfolded notation, just a matrix-vector
 t_{\mathrm{raw}} = X_{(1)} \operatorname{vec}(W^\circ).
 ```
 
-The package then orthogonalizes `t_raw` on earlier score vectors and normalizes it to
-unit length. With `T_{1:a-1}` denoting the previously extracted scores,
+The vector $t_{\mathrm{raw}}$ has one entry per sample. It is therefore a candidate score
+vector for the current component: each entry gives the coordinate of one sample on this
+candidate latent component.
+
+Because $X$ is not deflated in N-CPLS, the raw score can still contain variation that was
+already captured by earlier components. The purpose of score orthogonalization is to
+remove this already represented part before the score is stored.
+
+Let the previous score vectors be collected as columns in
+
+```math
+T_{1:a-1}
+=
+\begin{bmatrix}
+t_1 & t_2 & \cdots & t_{a-1}
+\end{bmatrix}.
+```
+
+The previous score vectors have already been orthogonalized and normalized. Therefore,
+the projection of $t_{\mathrm{raw}}$ onto the space spanned by the previous scores is
+
+```math
+t_{\mathrm{old}}
+=
+T_{1:a-1}
+\left(
+T_{1:a-1}^\top t_{\mathrm{raw}}
+\right).
+```
+
+This expression is best read from right to left. First,
+
+```math
+T_{1:a-1}^\top t_{\mathrm{raw}}
+```
+
+computes the inner products between the raw score and each previous score vector. These
+values tell how much of the raw score points in each previously used score direction.
+They are the coordinates of the projection of $t_{\mathrm{raw}}$ onto the old score
+space.
+
+Multiplication by $T_{1:a-1}$ then converts those coordinates back into a full vector in
+sample space:
+
+```math
+T_{1:a-1}
+\left(
+T_{1:a-1}^\top t_{\mathrm{raw}}
+\right).
+```
+
+This reconstructed vector is the part of $t_{\mathrm{raw}}$ that lies in the span of the
+previous score vectors. It is the part that should not be reused by the new component.
+
+The orthogonalized score is obtained by subtracting this old part from the raw score:
 
 ```math
 t
 =
-t_{\mathrm{raw}} - T_{1:a-1}(T_{1:a-1}^\top t_{\mathrm{raw}}),
-\qquad
-t = \frac{t}{\|t\|}.
+t_{\mathrm{raw}}
+-
+T_{1:a-1}
+\left(
+T_{1:a-1}^\top t_{\mathrm{raw}}
+\right).
 ```
 
-Because `t` is normalized, the loading calculations in the code do not need an explicit
-denominator `t^\top t`:
+Equivalently,
+
+```math
+t
+=
+\left(
+I - T_{1:a-1}T_{1:a-1}^\top
+\right)
+t_{\mathrm{raw}}.
+```
+
+The subtraction works because the raw score can be decomposed into an old part and a new
+orthogonal part:
+
+```math
+t_{\mathrm{raw}}
+=
+\underbrace{t_{\mathrm{old}}}_{\text{part explained by previous scores}}
++
+\underbrace{t_{\perp}}_{\text{new orthogonal part}}.
+```
+
+Thus,
+
+```math
+t_{\perp}
+=
+t_{\mathrm{raw}} - t_{\mathrm{old}}.
+```
+
+Graphically, the projection gives the shadow of the raw score on the old score space, and
+the subtraction leaves the perpendicular remainder:
+
+```text
+                    t_raw
+                     ↗
+                    /
+                   /
+                  /
+previous score →──────────
+       space       shadow
+
+orthogonal score = t_raw - shadow
+```
+
+Thus, score orthogonalization does not move the samples themselves. Instead, it modifies
+the new score vector so that its pattern across samples does not repeat the score
+patterns already captured by previous components.
+
+After orthogonalization, the score is normalized:
+
+```math
+t \leftarrow \frac{t}{\|t\|}.
+```
+
+The stored score vectors therefore satisfy
+
+```math
+T^\top T = I.
+```
+
+Because $t$ is normalized, the loading calculations in the code do not need an explicit
+denominator $t^\top t$:
 
 ```math
 P = X_{(1)}^\top t,
 \qquad
-q = Y^\top t,
-\qquad
+q = Y^\top t.
+```
+
+The primary-response matrix is then deflated by subtracting the part explained by the
+current score:
+
+```math
 Y \leftarrow Y - t q^\top.
 ```
 
-Only `Y` is deflated. `X` stays fixed throughout fitting. This is one of the main
-computational differences from classical N-PLS.
-
-### 5. After all components
-
-After the component loop, the package forms score-projection tensors `R` and cumulative
-regression coefficients `B`. In unfolded notation the main relation is
-
-```math
-R = W_A (P_A^\top W_A)^{-1},
-\qquad
-B = \operatorname{cumsum}(R \odot Q^\top).
-```
-
-Here `W_A`, `P_A`, and `Q` denote the component-wise stacks of predictor weights,
-predictor loadings, and response loadings. Predictions are obtained from the preprocessed
-predictors and the stored cumulative coefficient array, and the mean of $Y_{\mathrm{prim}}$ is added
-back afterwards.
+Only $Y$ is deflated. $X$ stays fixed throughout fitting. This is one of the main
+computational differences from classical N-PLS, and it is also why score
+orthogonalization is important: since $X$ itself is not deflated, later raw scores could
+otherwise rediscover score directions that were already used by earlier components.
 
 ## Orthogonalization Explained
 
