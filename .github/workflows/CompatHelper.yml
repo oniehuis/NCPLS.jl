@@ -44,7 +44,9 @@ jobs:
       - name: Run CompatHelper
         shell: julia --color=yes {0}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # If Actions is not allowed to open PRs in repository settings, add a
+          # PAT with repo scope as COMPATHELPER_GITHUB_TOKEN and it will be used instead.
+          GITHUB_TOKEN: ${{ secrets.COMPATHELPER_GITHUB_TOKEN != '' && secrets.COMPATHELPER_GITHUB_TOKEN || github.token }}
           # Reuse Documenter key if available; optional.
           COMPATHELPER_PRIV: ${{ secrets.DOCUMENTER_KEY }}
           # COMPATHELPER_PRIV: ${{ secrets.COMPATHELPER_PRIV }}
