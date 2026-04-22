@@ -32,7 +32,7 @@ up to an overall scaling factor. Thus, the multilinear branch replaces a separat
 coefficient for every possible predictor coordinate by a structured rank-1 approximation
 assembled from mode-wise weights. If the unfolded branch is used instead, that
 compression step is skipped and the coordinate-wise weight object is kept directly. In
-that sense, `multilinear = false` corresponds to using the CPLS-style direction in
+that sense, `multilinear=false` corresponds to using the CPLS-style direction in
 unfolded predictor space without the extra multilinear factorization.
 
 For the derivations below, it is convenient to write most calculations in terms of the
@@ -52,14 +52,14 @@ object is then refolded and approximated by the structured form above.
 
 ## Main Algorithmic Steps
 
-Each component is built in four steps: inference of response-specific predictor
-directions, selection of the optimal linear combination of these directions by CCA,
-optional compression of the resulting predictor-side weight object to a multilinear
-rank-1 form, and extraction of an orthogonal score vector. In the description below,
+Each component is built in four steps: 1) inference of response-specific predictor
+directions, 2) selection of the optimal linear combination of these directions by CCA,
+3) optional compression of the resulting predictor-side weight object to a multilinear
+rank-1 form, and 4) extraction of an orthogonal score vector. In the description below,
 $X$ denotes the preprocessed predictor tensor and $Y$ denotes the current deflated
 working copy of the preprocessed primary-response matrix. At the start of fitting,
 $Y = Y_{\mathrm{prim}}$. Under the default settings, this means centered $X$ and centered
-$Y_{\mathrm{prim}}$, while $Y_{\mathrm{add}}$, if present, is used as supplied.
+$Y_{\mathrm{prim}}$, while $Y_{\mathrm{add}}$, if present (see below), is used as supplied.
 
 ### 1. First supervised compression
 
@@ -114,7 +114,7 @@ linear combination of the columns of $Y$.
 c
 =
 \text{first left canonical weight vector from }
-\mathrm{CCA}(Z_0, Y),
+\mathrm{CCA}(Z_0, Y)
 \qquad
 ```
 
@@ -127,10 +127,9 @@ W_{(1)} = W_{0,(1)} c.
 ```
 
 This means that each unfolded predictor coordinate receives one combined weight obtained 
-from its response-specific candidate weights and the CCA coefficients in $c$.
-
-Thus, combining the candidate score columns by $c$ is equivalent to projecting
-$X_{(1)}$ onto one combined predictor vector:
+from its response-specific candidate weights and the CCA coefficients in $c$. Thus, 
+combining the candidate score columns by $c$ is equivalent to projecting $X_{(1)}$ onto 
+one combined predictor vector:
 
 ```math
 z = Z_0 c = X_{(1)} W_{(1)}.
@@ -145,21 +144,19 @@ object $W$. If the predictors are unfolded into one long variable axis, then $W$
 \prod_{j=1}^d p_j
 ```
 
-free weights. The multilinear branch replaces this by a much smaller set of mode-specific
+free weights. If `multilinear=false`, the package uses $W$ directly. This is the unfolded 
+branch, and it is equivalent to stopping after the CPLS-style calculation and keeping the 
+full predictor-side direction.
+
+If `multilinear=true`, the package replaces this by a much smaller set of mode-specific
 vectors with only
 
 ```math
 \sum_{j=1}^d p_j
 ```
 
-free weights.
-
-If `multilinear = false`, the package uses $W$ directly. This is the unfolded branch, and
-it is equivalent to stopping after the CPLS-style calculation and keeping the full
-predictor-side direction.
-
-If `multilinear = true`, the package refolds $W$ to predictor shape and approximates it by
-a rank-1 multilinear object
+free weights. Specifially, the package refolds $W$ to predictor shape and approximates it 
+by a rank-1 multilinear object
 
 ```math
 W^\circ = w^{(1)} \circ w^{(2)} \circ \cdots \circ w^{(d)}.
@@ -169,8 +166,8 @@ The exact approximation depends on the number of predictor modes: if $d = 1$, $W
 just normalized; if $d = 2$, the leading rank-1 SVD approximation is used; and if
 $d \ge 3$, a one-component PARAFAC model is fitted.
 
-After this factorization, the package optionally orthogonalizes the mode vectors on
-previous mode vectors, normalizes them, and then recombines them into the outer-product
+After this factorization, the package optionally orthogonalizes the mode vectors (see below) 
+on previous mode vectors, normalizes them, and then recombines them into the outer-product
 tensor $W^\circ$.
 
 The extracted mode vectors are not the objects used directly for the score calculation. 
@@ -182,8 +179,8 @@ This rank-1 restriction is both the main advantage and the main limitation of th
 multilinear branch. It gives one loading vector per mode, which is attractive for
 interpretation and often acts as useful regularization. But it also means that only
 separable predictor-side directions can be represented exactly. If the truly predictive
-direction is not well approximated by an outer product, the unfolded branch can be more
-flexible.
+direction is not well approximated by an outer product, the multilinear approach may 
+not the the right choice.
 
 ### 4. Score, loadings, and deflation
 
@@ -294,9 +291,9 @@ t_{\mathrm{raw}} - t_{\mathrm{old}}.
 ```
 
 Graphically, the projection gives the shadow of the raw score on the old score space, and
-the subtraction leaves the perpendicular remainder. Thus, score orthogonalization does not 
-move the samples themselves. Instead, it modifies the new score vector so that its pattern 
-across samples does not repeat the score patterns already captured by previous components.
+the subtraction leaves the perpendicular remainder. It modifies the new score vector so 
+that its pattern across samples does not repeat the score patterns already captured by 
+previous components.
 
 After orthogonalization, the score is normalized:
 
@@ -337,58 +334,39 @@ otherwise rediscover score directions that were already used by earlier componen
 
 ## Additional Responses (`Yadd`)
 
-The auxiliary response block $Y_{\mathrm{add}}$ is for sample-level information that is 
-available during fitting and is related to the same latent structure as $Y_{\mathrm{prim}}$, 
-but is not itself a prediction target. A typical use case is a low-noise proxy measurement, 
-metadata, or an auxiliary assay available only for the  calibration samples.
+The auxiliary response block $Y_{\mathrm{add}}$ contains sample-level information that is
+available during fitting and reflects the same latent structure as $Y_{\mathrm{prim}}$, but
+is not itself a prediction target. A typical use case is known metadata that explains part
+of the variation in $X$. Including this information as `Yadd` helps prevent that variation
+in $X$ from being misattributed to $Y_{\mathrm{prim}}$. In a discriminant-analysis setting,
+`Yadd` might encode instrument identity, acquisition date, or sample treatment. As a
+result, $Y_{\mathrm{add}}$ can make the first few components more parsimonious when
+$Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information is available.
 
-When `Yadd` is present, the following code branches are activated.
+Under the default centered-`X` workflow, constant column offsets in `Yadd` usually do not
+affect the latent directions, because they vanish in the product
+$X_{(1)}^\top Y_{\mathrm{add}}$. For that reason, the package does not offer to center 
+`Yadd` automatically.
 
-1\. The fitting loop forms `Ycomb = hcat(Y, Yadd)`.
-
-2\. `candidate_loading_weights` and `candidate_scores` use `Ycomb`, so the auxiliary
-   columns enlarge the supervised search space.
-
-3\. The candidate-score orthogonalization step for $Z_0$ is turned on.
-
-4\. CCA is still performed against the current deflated $Y$, not against `Ycomb`.
-
-5\. The response loading $q$, the deflation step, the regression coefficients, and
-   `predict` all use only `Yprim`.
-
-6\. New samples do not need `Yadd`, because the fitted model stores only predictor-side
-   objects and primary-response regression coefficients.
-
-This means that $Y_{\mathrm{add}}$ can therefore make the first few components more 
-parsimonious when $Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information exists. 
-In this package, however, `Yadd` is not centered automatically. Under the default 
-centered-`X` workflow, constant column offsets in `Yadd` usually do not change the latent 
-directions because they vanish in the product $X_{(1)}^\top Y_{\mathrm{add}}$. If $X$ is 
-not centered, or if you want a specific preprocessing convention for the auxiliary block, 
-center `Yadd` manually before calling [`fit`](@ref).
-
-
-## Orthogonalization
-
-### Candidate scores Z₀ on previous scores
-
-This branch is only used when `Yadd` is present. Before CCA, the package removes from
-each column of $Z_0$ the part that already lies in the span of previous score vectors:
+When `Yadd` is present, the algorithm includes one additional step: orthogonalization of
+the candidate scores $Z_0$ on the previously extracted scores. Before CCA, the package
+removes from each column of $Z_0$ the part that already lies in the span of the previous
+score vectors:
 
 ```math
 Z_0 \leftarrow Z_0 - T_{1:a-1}(T_{1:a-1}^\top Z_0).
 ```
 
 Intuitively, `Yadd` enlarges the supervised search space. Without this projection, the
-algorithm can keep rediscovering the same score direction through the auxiliary response
-columns. The manuscript writes the more general projector with
-$(T^\top T)^{-1}$. The package can omit that factor because the stored score matrix $T$
-is already orthonormal.
+algorithm could rediscover the same score direction through the auxiliary-response
+columns. The manuscript writes the more general projector with $(T^\top T)^{-1}$, but the
+package can omit that factor because the stored score matrix $T$ is already orthonormal.
 
-### Mode weights w⁽ʲ⁾ on previous mode weights
+
+## Orthogonalization of Mode Weights
 
 This step is optional and only exists in the multilinear branch. If
-`orthogonalize_mode_weights = true`, each mode vector is projected away from the
+`orthogonalize_mode_weights=true`, each mode vector is projected away from the
 previously stored mode vectors in the same mode:
 
 ```math
