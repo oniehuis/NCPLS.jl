@@ -402,6 +402,7 @@ component shapes overlap within a mode.
 By default this package does **not** impose that restriction, so predictor-side weight
 tensors are generally not orthogonal unless `orthogonalize_mode_weights=true`.
 
+
 ## Observation Weights
 
 When `obs_weights` are supplied, three parts of the fit change.
