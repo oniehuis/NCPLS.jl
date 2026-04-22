@@ -386,16 +386,17 @@ end
          num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
          num_inner_folds_repeats=num_inner_folds, max_components=spec.ncomponents,
          reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
-    cvda(X, sample_labels; kwargs...)
+    cvda(X, sample_labels::AbstractCategoricalArray; kwargs...)
 
 Run nested cross-validation for NCPLS discriminant analysis.
 
-The matrix method expects a one-hot encoded response matrix `Y`; the vector method accepts
-class labels and converts them internally to one-hot form. Outer and inner folds are
-stratified by class. The return value is the same tuple as [`nestedcv`](@ref): the
-outer-fold classification scores and the selected number of latent variables per outer
-fold. Mixed response blocks with additional continuous columns are not supported by this
-helper; use [`nestedcv`](@ref) directly with custom callbacks in that case.
+The matrix method expects a one-hot encoded response matrix `Y`; the categorical-label
+method accepts an `AbstractCategoricalArray` of class labels and converts it internally to
+one-hot form. Outer and inner folds are stratified by class. The return value is the same
+tuple as [`nestedcv`](@ref): the outer-fold classification scores and the selected number
+of latent variables per outer fold. Mixed response blocks with additional continuous
+columns are not supported by this helper; use [`nestedcv`](@ref) directly with custom
+callbacks in that case.
 """
 function cvda(
     X::AbstractArray{<:Real},
@@ -437,7 +438,7 @@ end
 
 function cvda(
     X::AbstractArray{<:Real},
-    sample_labels::AbstractVector;
+    sample_labels::AbstractCategoricalArray{T,1,R,V,C,U};
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
     weighted::Bool=true,
@@ -449,10 +450,7 @@ function cvda(
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
-)
-    eltype(sample_labels) <: Real && throw(ArgumentError(
-        "cvda expects categorical sampleclasses or one-hot Y."))
-
+) where {T,R,V,C,U}
     Y, responselabels = onehot(sample_labels)
     fit_kwargs = with_response_labels(fit_kwargs, responselabels)
 
@@ -473,22 +471,33 @@ function cvda(
     )
 end
 
+function cvda(
+    X::AbstractArray{<:Real},
+    sample_labels::AbstractVector;
+    kwargs...,
+)
+    throw(ArgumentError(
+        "cvda expects a categorical vector of class labels. Wrap the labels in " *
+        "`categorical(...)`, or pass a one-hot response matrix to the matrix method."))
+end
+
 """
     permda(X, Y; spec, fit_kwargs=(;), weighted=true, num_permutations=999,
            num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
            num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
            max_components=spec.ncomponents, reshuffle_outer_folds=false,
            rng=Random.GLOBAL_RNG, verbose=true)
-    permda(X, sample_labels; kwargs...)
+    permda(X, sample_labels::AbstractCategoricalArray; kwargs...)
 
 Run a permutation test around nested NCPLS discriminant-analysis cross-validation.
 
-The matrix method expects a one-hot encoded response matrix `Y`; the vector method
-accepts class labels and converts them internally to one-hot form. The returned vector
-contains one cross-validation score for each permutation and can be compared to the
-observed score from [`cvda`](@ref), for example via [`pvalue`](@ref). Mixed response
-blocks with additional continuous columns are not supported by this helper; use
-[`nestedcvperm`](@ref) directly with custom callbacks in that case.
+The matrix method expects a one-hot encoded response matrix `Y`; the categorical-label
+method accepts an `AbstractCategoricalArray` of class labels and converts it internally to
+one-hot form. The returned vector contains one cross-validation score for each
+permutation and can be compared to the observed score from [`cvda`](@ref), for example
+via [`pvalue`](@ref). Mixed response blocks with additional continuous columns are not
+supported by this helper; use [`nestedcvperm`](@ref) directly with custom callbacks in
+that case.
 """
 function permda(
     X::AbstractArray{<:Real},
@@ -532,7 +541,7 @@ end
 
 function permda(
     X::AbstractArray{<:Real},
-    sample_labels::AbstractVector;
+    sample_labels::AbstractCategoricalArray{T,1,R,V,C,U};
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
     weighted::Bool=true,
@@ -545,10 +554,7 @@ function permda(
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
-)
-    eltype(sample_labels) <: Real && throw(ArgumentError(
-        "permda expects categorical sampleclasses or one-hot Y."))
-
+) where {T,R,V,C,U}
     Y, responselabels = onehot(sample_labels)
     fit_kwargs = with_response_labels(fit_kwargs, responselabels)
 
@@ -568,6 +574,16 @@ function permda(
         rng=rng,
         verbose=verbose,
     )
+end
+
+function permda(
+    X::AbstractArray{<:Real},
+    sample_labels::AbstractVector;
+    kwargs...,
+)
+    throw(ArgumentError(
+        "permda expects a categorical vector of class labels. Wrap the labels in " *
+        "`categorical(...)`, or pass a one-hot response matrix to the matrix method."))
 end
 
 """
@@ -751,8 +767,9 @@ end
     outlierscan(X, Y; ...)
 
 Run repeated nested discriminant-analysis CV and count how often each sample is flagged.
-The response must be categorical labels or a pure one-hot class-indicator matrix; mixed
-response blocks with additional continuous columns are not supported here.
+The response must be an `AbstractCategoricalArray` of class labels or a pure one-hot
+class-indicator matrix; mixed response blocks with additional continuous columns are not
+supported here.
 """
 function outlierscan(
     X::AbstractArray{<:Real},
@@ -849,14 +866,21 @@ end
 
 function outlierscan(
     X::AbstractArray{<:Real},
+    sample_labels::AbstractCategoricalArray{T,1,R,V,C,U};
+    kwargs...,
+) where {T,R,V,C,U}
+    Y, _ = onehot(sample_labels)
+    outlierscan(X, Y; kwargs...)
+end
+
+function outlierscan(
+    X::AbstractArray{<:Real},
     sample_labels::AbstractVector;
     kwargs...,
 )
-    eltype(sample_labels) <: Real && throw(ArgumentError(
-        "outlierscan expects categorical sampleclasses or one-hot Y."))
-
-    Y, _ = onehot(sample_labels)
-    outlierscan(X, Y; kwargs...)
+    throw(ArgumentError(
+        "outlierscan expects a categorical vector of class labels. Wrap the labels in " *
+        "`categorical(...)`, or pass a one-hot response matrix to the matrix method."))
 end
 
 function optimize_num_latent_variables(

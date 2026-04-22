@@ -30,6 +30,7 @@ const CROSSVAL_X_MATRIX = Float64[
 const CROSSVAL_X_TENSOR = reshape(copy(CROSSVAL_X_MATRIX), size(CROSSVAL_X_MATRIX, 1), 2, 2)
 
 const CROSSVAL_CLASSES = repeat(["A", "B"], inner = size(CROSSVAL_X_MATRIX, 1) ÷ 2)
+const CROSSVAL_CLASSES_CAT = NCPLS.categorical(CROSSVAL_CLASSES)
 const CROSSVAL_Y = NCPLS.onehot(CROSSVAL_CLASSES)[1]
 const CROSSVAL_Y_REG = reshape(
     CROSSVAL_X_MATRIX[:, 1] .+ 0.5 .* CROSSVAL_X_MATRIX[:, 2],
@@ -329,11 +330,11 @@ end
     @test all(isfinite, permutation_scores)
 end
 
-@testset "cvda and permda support matrix and label inputs" begin
+@testset "cvda and permda support matrix and categorical-label inputs" begin
     scores, components = suppress_info() do
         NCPLS.cvda(
             CROSSVAL_X_TENSOR,
-            CROSSVAL_CLASSES;
+            CROSSVAL_CLASSES_CAT;
             spec = crossval_spec(),
             num_outer_folds = 2,
             num_outer_folds_repeats = 2,
@@ -365,12 +366,13 @@ end
     end
     @test scores_matrix == scores
     @test components_matrix == components
+    @test_throws ArgumentError NCPLS.cvda(CROSSVAL_X_TENSOR, CROSSVAL_CLASSES; spec = crossval_spec())
     @test_throws ArgumentError NCPLS.cvda(CROSSVAL_X_TENSOR, collect(1:size(CROSSVAL_X_TENSOR, 1)); spec = crossval_spec())
 
     permutation_scores = suppress_info() do
         NCPLS.permda(
             CROSSVAL_X_TENSOR,
-            CROSSVAL_CLASSES;
+            CROSSVAL_CLASSES_CAT;
             spec = crossval_spec(),
             num_permutations = 2,
             num_outer_folds = 2,
@@ -384,6 +386,7 @@ end
     end
     @test length(permutation_scores) == 2
     @test all(0.0 ≤ acc ≤ 1.0 for acc in permutation_scores)
+    @test_throws ArgumentError NCPLS.permda(CROSSVAL_X_TENSOR, CROSSVAL_CLASSES; spec = crossval_spec())
     @test_throws ArgumentError NCPLS.permda(CROSSVAL_X_TENSOR, collect(1:size(CROSSVAL_X_TENSOR, 1)); spec = crossval_spec())
 end
 
@@ -428,4 +431,22 @@ end
     end
     @test length(out_unweighted.n_tested) == size(CROSSVAL_X_TENSOR, 1)
     @test all(out_unweighted.n_flagged .≤ out_unweighted.n_tested)
+
+    out_labels = suppress_info() do
+        NCPLS.outlierscan(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_CLASSES_CAT;
+            spec = crossval_spec(),
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 2,
+            num_inner_folds_repeats = 2,
+            max_components = 1,
+            rng = MersenneTwister(111),
+            verbose = false,
+        )
+    end
+    @test length(out_labels.n_tested) == size(CROSSVAL_X_TENSOR, 1)
+    @test all(out_labels.n_flagged .≤ out_labels.n_tested)
+    @test_throws ArgumentError NCPLS.outlierscan(CROSSVAL_X_TENSOR, CROSSVAL_CLASSES; spec = crossval_spec())
 end
