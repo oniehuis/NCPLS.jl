@@ -70,15 +70,9 @@ W_{0,(1)} = X_{(1)}^\top Y_{\mathrm{comb}}.
 ```
 
 The resulting matrix $W_{0,(1)}$ has one row for every column of the unfolded predictor
-matrix $X_{(1)}$ and one column for every column of $Y_{\mathrm{comb}}$. Its
-$(j, k)$ entry is
-
-```math
-w_{0,jk} = \sum_{i=1}^n x_{ij} y_{\mathrm{comb},ik},
-```
-
-or the corresponding weighted sum if observation weights are used. These entries summarize 
-how predictor coordinate $j$ and response column $k$ vary together across the samples:
+matrix $X_{(1)}$ and one column for every column of $Y_{\mathrm{comb}}$. These entries 
+summarize how predictor coordinate $j$ and response column $k$ vary together across the 
+samples:
 
 - large positive values mean that samples with large positive
   $y_{\mathrm{comb},ik}$ tend also to have
@@ -126,14 +120,8 @@ $W_{0,(1)}$ into one single predictor vector:
 W_{(1)} = W_{0,(1)} c.
 ```
 
-Entrywise, this means
-
-```math
-w_j = \sum_{k=1}^m w_{0,jk} c_k,
-```
-
-so each unfolded predictor coordinate receives one combined weight obtained from its
-response-specific candidate weights and the CCA coefficients in $c$.
+This means that each unfolded predictor coordinate receives one combined weight obtained 
+from its response-specific candidate weights and the CCA coefficients in $c$.
 
 Thus, combining the candidate score columns by $c$ is equivalent to projecting
 $X_{(1)}$ onto one combined predictor vector:
@@ -179,15 +167,12 @@ After this factorization, the package optionally orthogonalizes the mode vectors
 previous mode vectors, normalizes them, and then recombines them into the outer-product
 tensor $W^\circ$.
 
-Two points are important here.
+The extracted mode vectors are not the objects used directly for the score calculation. 
+They are recombined into the single predictor-side weight tensor $W^\circ$, and the score 
+vector is computed from that combined tensor. In other words, the multilinear factors are 
+an interpretable parameterization of the component, not separate component scores.
 
-First, the extracted mode vectors are not the objects used directly for the score
-calculation. They are recombined into the single predictor-side weight tensor $W^\circ$,
-and the score vector is computed from that combined tensor. In other words, the
-multilinear factors are an interpretable parameterization of the component, not separate
-component scores.
-
-Second, this rank-1 restriction is both the main advantage and the main limitation of the
+This rank-1 restriction is both the main advantage and the main limitation of the 
 multilinear branch. It gives one loading vector per mode, which is attractive for
 interpretation and often acts as useful regularization. But it also means that only
 separable predictor-side directions can be represented exactly. If the truly predictive
@@ -303,23 +288,9 @@ t_{\mathrm{raw}} - t_{\mathrm{old}}.
 ```
 
 Graphically, the projection gives the shadow of the raw score on the old score space, and
-the subtraction leaves the perpendicular remainder:
-
-```text
-                    t_raw
-                     ↗
-                    /
-                   /
-                  /
-previous score →──────────
-       space       shadow
-
-orthogonal score = t_raw - shadow
-```
-
-Thus, score orthogonalization does not move the samples themselves. Instead, it modifies
-the new score vector so that its pattern across samples does not repeat the score
-patterns already captured by previous components.
+the subtraction leaves the perpendicular remainder. Thus, score orthogonalization does not 
+move the samples themselves. Instead, it modifies the new score vector so that its pattern 
+across samples does not repeat the score patterns already captured by previous components.
 
 After orthogonalization, the score is normalized:
 
@@ -334,7 +305,8 @@ T^\top T = I.
 ```
 
 Because $t$ is normalized, the loading calculations in the code do not need an explicit
-denominator $t^\top t$:
+denominator $t^\top t$. The predictor-side loading $P$ is obtained by projecting $X$ onto
+$t$, thereby describing how the original variables align with the component:
 
 ```math
 P = X_{(1)}^\top t,
@@ -342,8 +314,10 @@ P = X_{(1)}^\top t,
 q = Y^\top t.
 ```
 
-The primary-response matrix is then deflated by subtracting the part explained by the
-current score:
+On the response side, this can be read in three steps: compute how strongly each column
+of $Y$ aligns with $t$ via $q = Y^\top t$, rebuild the part of $Y$ lying along $t$ as
+$t q^\top$, and then remove that explained part. Because $t$ is normalized, the rank-1
+term $t q^\top$ is already on the scale of the current working $Y$:
 
 ```math
 Y \leftarrow Y - t q^\top.
@@ -354,21 +328,41 @@ computational differences from classical N-PLS, and it is also why score
 orthogonalization is important: since $X$ itself is not deflated, later raw scores could
 otherwise rediscover score directions that were already used by earlier components.
 
-## Orthogonalization Explained
 
-The paper mainly discusses two orthogonalization ideas. The package contains three
-orthogonalization-related operations in total, and separating them makes the algorithm
-much easier to understand.
+## Additional Responses (`Yadd`)
 
-Because the stored score matrix $T$ is orthonormal, orthogonalization is just projection
-subtraction. For a current vector or matrix $x$,
+The auxiliary response block $Y_{\mathrm{add}}$ is for sample-level information that is 
+available during fitting and is related to the same latent structure as $Y_{\mathrm{prim}}$, 
+but is not itself a prediction target. A typical use case is a low-noise proxy measurement, 
+metadata, or an auxiliary assay available only for the  calibration samples.
 
-```math
-x_{\perp} = x - T(T^\top x).
-```
+When `Yadd` is present, the following code branches are activated.
 
-This removes the part of $x$ that lies in the span of the previous score vectors and
-keeps only the perpendicular remainder.
+1\. The fitting loop forms `Ycomb = hcat(Y, Yadd)`.
+
+2\. `candidate_loading_weights` and `candidate_scores` use `Ycomb`, so the auxiliary
+   columns enlarge the supervised search space.
+
+3\. The candidate-score orthogonalization step for $Z_0$ is turned on.
+
+4\. CCA is still performed against the current deflated $Y$, not against `Ycomb`.
+
+5\. The response loading $q$, the deflation step, the regression coefficients, and
+   `predict` all use only `Yprim`.
+
+6\. New samples do not need `Yadd`, because the fitted model stores only predictor-side
+   objects and primary-response regression coefficients.
+
+This means that $Y_{\mathrm{add}}$ can therefore make the first few components more 
+parsimonious when $Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information exists. 
+In this package, however, `Yadd` is not centered automatically. Under the default 
+centered-`X` workflow, constant column offsets in `Yadd` usually do not change the latent 
+directions because they vanish in the product $X_{(1)}^\top Y_{\mathrm{add}}$. If $X$ is 
+not centered, or if you want a specific preprocessing convention for the auxiliary block, 
+center `Yadd` manually before calling [`fit`](@ref).
+
+
+## Orthogonalization
 
 ### Candidate scores Z₀ on previous scores
 
@@ -384,20 +378,6 @@ algorithm can keep rediscovering the same score direction through the auxiliary 
 columns. The manuscript writes the more general projector with
 $(T^\top T)^{-1}$. The package can omit that factor because the stored score matrix $T$
 is already orthonormal.
-
-### Final score t on previous scores
-
-This step is always used. Even if `Yadd` is absent, the raw score direction obtained from
-$W$ or $W^\circ$ may still contain parts of earlier components. Orthogonalizing
-$t_{\mathrm{raw}}$ and then normalizing it ensures
-
-```math
-T^\top T = I.
-```
-
-This is why later projections can use the simple formula `T * (T' * x)` instead of a
-general least-squares projector. It is also what makes the stored component scores easy
-to interpret as separate latent axes.
 
 ### Mode weights w⁽ʲ⁾ on previous mode weights
 
@@ -420,14 +400,14 @@ stricter model constraint, so it can reduce predictive performance when the true
 component shapes overlap within a mode.
 
 By default this package does **not** impose that restriction, so predictor-side weight
-tensors are generally not orthogonal unless `orthogonalize_mode_weights = true`.
+tensors are generally not orthogonal unless `orthogonalize_mode_weights=true`.
 
 ## Observation Weights
 
 When `obs_weights` are supplied, three parts of the fit change.
 
-First, preprocessing of $X$ and $Y_{\mathrm{prim}}$ uses weighted means and weighted standard
-deviations along the sample mode. Second, candidate loading weights become
+First, preprocessing of $X$ and $Y_{\mathrm{prim}}$ uses weighted means and weighted 
+standard deviations along the sample mode. Second, candidate loading weights become
 
 ```math
 W_{0,(1)} = X_{(1)}^\top D_w Y_{\mathrm{comb}},
@@ -438,34 +418,3 @@ D_w = \operatorname{diag}(w_1,\ldots,w_n).
 Third, the CCA step uses row-scaled matrices $D_w^{1/2} Z_0$ and $D_w^{1/2} Y$. This
 matches the usual covariance-weighting convention: the weights enter linearly in the
 cross-products and as square roots in the CCA row scaling.
-
-## Additional Responses (`Yadd`)
-
-
-The auxiliary response block $Y_{\mathrm{add}}$ is for sample-level information that is available during fitting and is related to the same latent structure as 
-$Y_{\mathrm{prim}}$, but is not itself a prediction target. A typical use case is a 
-low-noise proxy measurement, metadata, or an auxiliary assay available only for the 
-calibration samples.
-
-When `Yadd` is present, the following code branches are activated.
-
-1\. The fitting loop forms `Ycomb = hcat(Y, Yadd)`.
-
-2\. `candidate_loading_weights` and `candidate_scores` use `Ycomb`, so the auxiliary
-   columns enlarge the supervised search space.
-
-3\. The candidate-score orthogonalization step for $Z_0$ is turned on.
-
-4\. CCA is still performed against the current deflated $Y$, not against `Ycomb`.
-
-5\. The response loading $q$, the deflation step, the regression coefficients, and
-   `predict` all use only `Yprim`.
-
-6\. New samples do not need `Yadd`, because the fitted model stores only predictor-side
-   objects and primary-response regression coefficients.
-
-
-This means that $Y_{\mathrm{add}}$ can therefore make the first few components more parsimonious when $Y_{\mathrm{prim}}$ is noisy but aligned auxiliary information exists. 
-In this package, however, `Yadd` is not centered automatically. Under the default 
-centered-`X` workflow, constant column offsets in `Yadd` usually do not change the latent directions because they vanish in the product $X_{(1)}^\top Y_{\mathrm{add}}$. If $X$ is 
-not centered, or if you want a specific preprocessing convention for the auxiliary block, center `Yadd` manually before calling [`fit`](@ref).
