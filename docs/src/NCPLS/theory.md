@@ -14,26 +14,15 @@ the predictor space is large relative to the number of samples and predictor var
 show substantial collinearity, so that coefficient estimation by ordinary regression
 methods would be unstable or impossible.
 
-The paper formulates N-CPLS as a multiway extension of canonical PLS. Below, the method
-is explained mainly in terms of the mode-1 unfolding of the predictor tensor, because
-that two-dimensional representation is easier to visualize and usually easier to follow
-than the full multiway notation. The matrix in which each sample tensor is stacked into
-one row is
-
-```math
-X_{(1)} \in \mathbb{R}^{n \times p},
-\qquad
-p = \prod_{j=1}^d p_j,
-```
-
-If the multilinear branch of the algorithm is enabled (default), the collapsed
-predictor-side weight object obtained from the unfolded calculations is not kept as an
-independent weight for every unfolded predictor coordinate. Instead, it is approximated by
-one weight vector for each predictor mode. For a $d$-way predictor tensor, this means that
-mode-specific vectors
+The paper formulates N-CPLS as a multiway extension of canonical PLS. Its main
+distinguishing feature, relative to simply unfolding the tensor and applying CPLS, is the
+default multilinear branch. In that branch, the collapsed predictor-side weight object is
+not kept as an independent weight for every unfolded predictor coordinate. Instead, it is
+approximated by one weight vector for each predictor mode. For a $d$-way predictor
+tensor, this means that mode-specific vectors
 $w^{(1)} \in \mathbb{R}^{p_1}, \ldots, w^{(d)} \in \mathbb{R}^{p_d}$ are estimated, and
-the weight assigned to predictor coordinate $(j_1, \ldots, j_d)$ is then reconstructed
-from their outer product:
+the weight assigned to predictor coordinate $(j_1, \ldots, j_d)$ is reconstructed from
+their outer product:
 
 ```math
 W_{j_1,\ldots,j_d} \approx w^{(1)}_{j_1} w^{(2)}_{j_2} \cdots w^{(d)}_{j_d},
@@ -42,7 +31,24 @@ W_{j_1,\ldots,j_d} \approx w^{(1)}_{j_1} w^{(2)}_{j_2} \cdots w^{(d)}_{j_d},
 up to an overall scaling factor. Thus, the multilinear branch replaces a separate
 coefficient for every possible predictor coordinate by a structured rank-1 approximation
 assembled from mode-wise weights. If the unfolded branch is used instead, that
-compression step is skipped and the coordinate-wise weight object is kept directly.
+compression step is skipped and the coordinate-wise weight object is kept directly. In
+that sense, `multilinear = false` corresponds to using the CPLS-style direction in
+unfolded predictor space without the extra multilinear factorization.
+
+For the derivations below, it is convenient to write most calculations in terms of the
+mode-1 unfolding of the predictor tensor, because that two-dimensional representation is
+easier to visualize and usually easier to follow than the full multiway notation. The
+matrix in which each sample tensor is stacked into one row is
+
+```math
+X_{(1)} \in \mathbb{R}^{n \times p},
+\qquad
+p = \prod_{j=1}^d p_j,
+```
+
+This unfolded representation is used mainly for exposition and for some intermediate
+calculations. In the default multilinear branch, the resulting predictor-side weight
+object is then refolded and approximated by the structured form above.
 
 ## Main Algorithmic Steps
 
