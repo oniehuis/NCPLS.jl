@@ -269,7 +269,9 @@ end
     cvreg(X, Y; spec, fit_kwargs=(;), num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
           num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
           reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
-    cvreg(X, y; kwargs...)
+    cvreg(X, y; spec, fit_kwargs=(;), num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
+          num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
+          reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
 
 Run nested cross-validation for NCPLS regression.
 
@@ -316,9 +318,29 @@ end
 function cvreg(
     X::AbstractArray{<:Real},
     y::AbstractVector{<:Real};
-    kwargs...,
+    spec::NCPLSModel,
+    fit_kwargs::NamedTuple=(;),
+    num_outer_folds::Integer=8,
+    num_outer_folds_repeats::Integer=num_outer_folds,
+    num_inner_folds::Integer=7,
+    num_inner_folds_repeats::Integer=num_inner_folds,
+    reshuffle_outer_folds::Bool=false,
+    rng::AbstractRNG=Random.GLOBAL_RNG,
+    verbose::Bool=true,
 )
-    cvreg(X, reshape(y, :, 1); kwargs...)
+    cvreg(
+        X,
+        reshape(y, :, 1);
+        spec=spec,
+        fit_kwargs=fit_kwargs,
+        num_outer_folds=num_outer_folds,
+        num_outer_folds_repeats=num_outer_folds_repeats,
+        num_inner_folds=num_inner_folds,
+        num_inner_folds_repeats=num_inner_folds_repeats,
+        reshuffle_outer_folds=reshuffle_outer_folds,
+        rng=rng,
+        verbose=verbose,
+    )
 end
 
 """
@@ -326,7 +348,10 @@ end
             num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
             num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
             rng=Random.GLOBAL_RNG, verbose=true)
-    permreg(X, y; kwargs...)
+    permreg(X, y; spec, fit_kwargs=(;), num_permutations=999, num_outer_folds=8,
+            num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
+            num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
+            rng=Random.GLOBAL_RNG, verbose=true)
 
 Run a permutation test around nested NCPLS regression cross-validation.
 
@@ -375,9 +400,31 @@ end
 function permreg(
     X::AbstractArray{<:Real},
     y::AbstractVector{<:Real};
-    kwargs...,
+    spec::NCPLSModel,
+    fit_kwargs::NamedTuple=(;),
+    num_permutations::Integer=999,
+    num_outer_folds::Integer=8,
+    num_outer_folds_repeats::Integer=num_outer_folds,
+    num_inner_folds::Integer=7,
+    num_inner_folds_repeats::Integer=num_inner_folds,
+    reshuffle_outer_folds::Bool=false,
+    rng::AbstractRNG=Random.GLOBAL_RNG,
+    verbose::Bool=true,
 )
-    permreg(X, reshape(y, :, 1); kwargs...)
+    permreg(
+        X,
+        reshape(y, :, 1);
+        spec=spec,
+        fit_kwargs=fit_kwargs,
+        num_permutations=num_permutations,
+        num_outer_folds=num_outer_folds,
+        num_outer_folds_repeats=num_outer_folds_repeats,
+        num_inner_folds=num_inner_folds,
+        num_inner_folds_repeats=num_inner_folds_repeats,
+        reshuffle_outer_folds=reshuffle_outer_folds,
+        rng=rng,
+        verbose=verbose,
+    )
 end
 
 """
@@ -385,7 +432,10 @@ end
          num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
          num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
          rng=Random.GLOBAL_RNG, verbose=true)
-    cvda(X, sample_labels::AbstractCategoricalArray; kwargs...)
+    cvda(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;), weighted=true,
+         num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
+         num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
+         reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
 
 Run nested cross-validation for NCPLS discriminant analysis.
 
@@ -482,7 +532,11 @@ end
            num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
            num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
            reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
-    permda(X, sample_labels::AbstractCategoricalArray; kwargs...)
+    permda(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;), weighted=true,
+           num_permutations=999, num_outer_folds=8,
+           num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
+           num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
+           rng=Random.GLOBAL_RNG, verbose=true)
 
 Run a permutation test around nested NCPLS discriminant-analysis cross-validation.
 
@@ -759,6 +813,9 @@ end
     outlierscan(X, Y; spec, fit_kwargs=(;), obs_weight_fn=default_da_obs_weight_fn,
                 weighted=true, num_outer_folds=8,
                 num_outer_folds_repeats=10*num_outer_folds, ...)
+    outlierscan(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;),
+                obs_weight_fn=default_da_obs_weight_fn, weighted=true,
+                num_outer_folds=8, num_outer_folds_repeats=10*num_outer_folds, ...)
 
 Run repeated nested discriminant-analysis CV and count how often each sample is flagged.
 The response must be an `AbstractCategoricalArray` of class labels or a pure one-hot
@@ -863,10 +920,34 @@ end
 function outlierscan(
     X::AbstractArray{<:Real},
     sample_labels::AbstractCategoricalArray{T,1,R,V,C,U};
-    kwargs...,
+    spec::NCPLSModel,
+    fit_kwargs::NamedTuple=(;),
+    obs_weight_fn::Union{Function, Nothing}=default_da_obs_weight_fn,
+    weighted::Bool=true,
+    num_outer_folds::Integer=8,
+    num_outer_folds_repeats::Integer=10 * num_outer_folds,
+    num_inner_folds::Integer=7,
+    num_inner_folds_repeats::Integer=num_inner_folds,
+    reshuffle_outer_folds::Bool=true,
+    rng::AbstractRNG=Random.GLOBAL_RNG,
+    verbose::Bool=true,
 ) where {T,R,V,C,U}
     Y, _ = onehot(sample_labels)
-    outlierscan(X, Y; kwargs...)
+    outlierscan(
+        X,
+        Y;
+        spec=spec,
+        fit_kwargs=fit_kwargs,
+        obs_weight_fn=obs_weight_fn,
+        weighted=weighted,
+        num_outer_folds=num_outer_folds,
+        num_outer_folds_repeats=num_outer_folds_repeats,
+        num_inner_folds=num_inner_folds,
+        num_inner_folds_repeats=num_inner_folds_repeats,
+        reshuffle_outer_folds=reshuffle_outer_folds,
+        rng=rng,
+        verbose=verbose,
+    )
 end
 
 function outlierscan(
