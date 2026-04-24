@@ -26,6 +26,10 @@ current outer repeat is the median of the inner-fold selections, rounded down to
 integer. A final model is then fitted on the full outer training set with that selected
 number of components and applied to the outer test set.
 
+The convenience wrappers [`cvreg`](@ref), [`permreg`](@ref), [`cvda`](@ref),
+[`permda`](@ref), and [`outlierscan`](@ref) use `spec.ncomponents` as this maximum
+component count.
+
 The return value of `nestedcv` is a pair `(scores, best_components)`:
 
 - `scores` contains one outer-fold score per outer repeat,
@@ -118,7 +122,6 @@ reg_scores, reg_best_components = cvreg(
     num_outer_folds_repeats=4,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=2,
     rng=MersenneTwister(24680),
     verbose=false,
 )
@@ -148,7 +151,6 @@ regression_null_scores = permreg(
     num_outer_folds_repeats=4,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=2,
     rng=MersenneTwister(13579),
     verbose=false,
 )
@@ -186,7 +188,6 @@ da_scores, da_best_components = cvda(
     num_outer_folds_repeats=4,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=2,
     rng=MersenneTwister(12345),
     verbose=false,
 )
@@ -215,7 +216,6 @@ classification_null_scores = permda(
     num_outer_folds_repeats=4,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=2,
     rng=MersenneTwister(54321),
     verbose=false,
 )
@@ -276,7 +276,6 @@ function dominant_wrong_predictions(
     num_outer_folds_repeats=20,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=spec.ncomponents,
     reshuffle_outer_folds=true,
     rng=MersenneTwister(54321),
     verbose=false,
@@ -317,7 +316,7 @@ function dominant_wrong_predictions(
         best_k = NCPLS.optimize_num_latent_variables(
             X_train,
             Y_train,
-            max_components,
+            spec.ncomponents,
             num_inner_folds,
             num_inner_folds_repeats,
             spec,
@@ -376,7 +375,6 @@ outlier_scan = outlierscan(
     num_outer_folds_repeats=20,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=2,
     rng=MersenneTwister(54321),
     verbose=false,
 )
@@ -391,7 +389,6 @@ wrong_prediction_summary = dominant_wrong_predictions(
     num_outer_folds_repeats=20,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
-    max_components=2,
     rng=MersenneTwister(54321),
     verbose=false,
 )

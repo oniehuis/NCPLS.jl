@@ -285,7 +285,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(666),
             verbose = false,
         )
@@ -303,7 +302,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(666),
             verbose = false,
         )
@@ -321,7 +319,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(777),
             verbose = false,
         )
@@ -340,7 +337,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(444),
             verbose = false,
         )
@@ -359,7 +355,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(444),
             verbose = false,
         )
@@ -379,7 +374,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(555),
             verbose = false,
         )
@@ -401,7 +395,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(111),
             verbose = false,
         )
@@ -420,11 +413,11 @@ end
             spec = crossval_spec(),
             fit_kwargs = (; responselabels = ["A", "B"]),
             obs_weight_fn = nothing,
+            weighted = false,
             num_outer_folds = 2,
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(111),
             verbose = false,
         )
@@ -441,7 +434,6 @@ end
             num_outer_folds_repeats = 2,
             num_inner_folds = 2,
             num_inner_folds_repeats = 2,
-            max_components = 1,
             rng = MersenneTwister(111),
             verbose = false,
         )
