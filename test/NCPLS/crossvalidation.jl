@@ -38,8 +38,8 @@ const CROSSVAL_Y_REG = reshape(
     1,
 )
 
-function crossval_spec(; multilinear::Bool=true)
-    NCPLSModel(ncomponents = 1, multilinear = multilinear, multilinear_seed = 2)
+function crossval_spec(; ncomponents::Integer=1, multilinear::Bool=true)
+    NCPLSModel(ncomponents = ncomponents, multilinear = multilinear, multilinear_seed = 2)
 end
 
 @testset "encoding helpers" begin
@@ -247,6 +247,39 @@ end
     @test weight_calls[] == 6
 end
 
+@testset "nestedcv can skip inner folds with fixed components" begin
+    cfg = NCPLS.cv_classification()
+    weight_calls = Ref(0)
+
+    scores, components = suppress_info() do
+        NCPLS.nestedcv(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_Y;
+            spec = crossval_spec(ncomponents = 2),
+            fit_kwargs = (; responselabels = ["A", "B"]),
+            obs_weight_fn = (X, Y; kwargs...) -> begin
+                weight_calls[] += 1
+                ones(size(X, 1))
+            end,
+            score_fn = cfg.score_fn,
+            predict_fn = cfg.predict_fn,
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            strata = NCPLS.sampleclasses(CROSSVAL_Y),
+            rng = MersenneTwister(124),
+            verbose = false,
+        )
+    end
+
+    @test length(scores) == 2
+    @test all(0.0 ≤ acc ≤ 1.0 for acc in scores)
+    @test components == [2, 2]
+    @test weight_calls[] == 2
+end
+
 @testset "nestedcvperm shuffles tensor-response pairings" begin
     cfg = NCPLS.cv_classification()
     perms = suppress_info() do
@@ -273,6 +306,29 @@ end
 
     @test length(perms) == 2
     @test all(0.0 ≤ acc ≤ 1.0 for acc in perms)
+
+    fixed_perms = suppress_info() do
+        NCPLS.nestedcvperm(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_Y;
+            spec = crossval_spec(ncomponents = 2),
+            fit_kwargs = (; responselabels = ["A", "B"]),
+            obs_weight_fn = (X, Y; kwargs...) -> ones(size(X, 1)),
+            score_fn = cfg.score_fn,
+            predict_fn = cfg.predict_fn,
+            num_permutations = 1,
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            strata = NCPLS.sampleclasses(CROSSVAL_Y),
+            rng = MersenneTwister(322),
+            verbose = false,
+        )
+    end
+    @test length(fixed_perms) == 1
+    @test all(0.0 ≤ acc ≤ 1.0 for acc in fixed_perms)
 end
 
 @testset "cvreg and permreg support tensor predictors" begin
@@ -309,6 +365,24 @@ end
     @test scores_vec == scores
     @test components_vec == components
 
+    fixed_scores, fixed_components = suppress_info() do
+        NCPLS.cvreg(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_Y_REG;
+            spec = crossval_spec(ncomponents = 2),
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            rng = MersenneTwister(667),
+            verbose = false,
+        )
+    end
+    @test length(fixed_scores) == 2
+    @test fixed_components == [2, 2]
+    @test all(isfinite, fixed_scores)
+
     permutation_scores = suppress_info() do
         NCPLS.permreg(
             CROSSVAL_X_TENSOR,
@@ -325,6 +399,24 @@ end
     end
     @test length(permutation_scores) == 2
     @test all(isfinite, permutation_scores)
+
+    fixed_permutation_scores = suppress_info() do
+        NCPLS.permreg(
+            CROSSVAL_X_TENSOR,
+            vec(CROSSVAL_Y_REG);
+            spec = crossval_spec(ncomponents = 2),
+            num_permutations = 1,
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            rng = MersenneTwister(778),
+            verbose = false,
+        )
+    end
+    @test length(fixed_permutation_scores) == 1
+    @test all(isfinite, fixed_permutation_scores)
 end
 
 @testset "cvda and permda support matrix and categorical-label inputs" begin
@@ -364,6 +456,24 @@ end
     @test_throws ArgumentError NCPLS.cvda(CROSSVAL_X_TENSOR, CROSSVAL_CLASSES; spec = crossval_spec())
     @test_throws ArgumentError NCPLS.cvda(CROSSVAL_X_TENSOR, collect(1:size(CROSSVAL_X_TENSOR, 1)); spec = crossval_spec())
 
+    fixed_scores, fixed_components = suppress_info() do
+        NCPLS.cvda(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_CLASSES_CAT;
+            spec = crossval_spec(ncomponents = 2),
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            rng = MersenneTwister(445),
+            verbose = false,
+        )
+    end
+    @test length(fixed_scores) == 2
+    @test fixed_components == [2, 2]
+    @test all(0.0 ≤ acc ≤ 1.0 for acc in fixed_scores)
+
     permutation_scores = suppress_info() do
         NCPLS.permda(
             CROSSVAL_X_TENSOR,
@@ -380,6 +490,24 @@ end
     end
     @test length(permutation_scores) == 2
     @test all(0.0 ≤ acc ≤ 1.0 for acc in permutation_scores)
+
+    fixed_permutation_scores = suppress_info() do
+        NCPLS.permda(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_CLASSES_CAT;
+            spec = crossval_spec(ncomponents = 2),
+            num_permutations = 1,
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            rng = MersenneTwister(556),
+            verbose = false,
+        )
+    end
+    @test length(fixed_permutation_scores) == 1
+    @test all(0.0 ≤ acc ≤ 1.0 for acc in fixed_permutation_scores)
     @test_throws ArgumentError NCPLS.permda(CROSSVAL_X_TENSOR, CROSSVAL_CLASSES; spec = crossval_spec())
     @test_throws ArgumentError NCPLS.permda(CROSSVAL_X_TENSOR, collect(1:size(CROSSVAL_X_TENSOR, 1)); spec = crossval_spec())
 end
@@ -440,5 +568,29 @@ end
     end
     @test length(out_labels.n_tested) == size(CROSSVAL_X_TENSOR, 1)
     @test all(out_labels.n_flagged .≤ out_labels.n_tested)
+
+    fixed_weight_calls = Ref(0)
+    out_fixed = suppress_info() do
+        NCPLS.outlierscan(
+            CROSSVAL_X_TENSOR,
+            CROSSVAL_Y;
+            spec = crossval_spec(ncomponents = 2),
+            fit_kwargs = (; responselabels = ["A", "B"]),
+            obs_weight_fn = (X, Y; kwargs...) -> begin
+                fixed_weight_calls[] += 1
+                ones(size(X, 1))
+            end,
+            num_outer_folds = 2,
+            num_outer_folds_repeats = 2,
+            num_inner_folds = 0,
+            num_inner_folds_repeats = 0,
+            select_ncomponents = false,
+            rng = MersenneTwister(112),
+            verbose = false,
+        )
+    end
+    @test length(out_fixed.n_tested) == size(CROSSVAL_X_TENSOR, 1)
+    @test all(out_fixed.n_flagged .≤ out_fixed.n_tested)
+    @test fixed_weight_calls[] == 2
     @test_throws ArgumentError NCPLS.outlierscan(CROSSVAL_X_TENSOR, CROSSVAL_CLASSES; spec = crossval_spec())
 end

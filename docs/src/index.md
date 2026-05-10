@@ -7,7 +7,7 @@ method extends the CPLS approach introduced by Indahl et al. (2009), which was o
 designed for matrix-shaped predictors. The matrix-based approach is implemented in the 
 Julia package [CPPLS.jl](https://github.com/oniehuis/CPPLS.jl), which additionally 
 incorporates the "power" parameter extension outlined by Indahl (2009) and Liland & Indahl 
-(2009)—hence the additional "P" in the acronym.
+(2009).
 
 ## Installation
 

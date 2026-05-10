@@ -266,12 +266,14 @@ function cv_regression(;
 end
 
 """
-    cvreg(X, Y; spec, fit_kwargs=(;), num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
-          num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
-          reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
-    cvreg(X, y; spec, fit_kwargs=(;), num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
-          num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
-          reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
+    cvreg(X, Y; spec, fit_kwargs=(;), num_outer_folds=5, num_outer_folds_repeats=num_outer_folds,
+          num_inner_folds=4, num_inner_folds_repeats=num_inner_folds,
+          select_ncomponents=true, reshuffle_outer_folds=false,
+          rng=Random.GLOBAL_RNG, verbose=true)
+    cvreg(X, y; spec, fit_kwargs=(;), num_outer_folds=5, num_outer_folds_repeats=num_outer_folds,
+          num_inner_folds=4, num_inner_folds_repeats=num_inner_folds,
+          select_ncomponents=true, reshuffle_outer_folds=false,
+          rng=Random.GLOBAL_RNG, verbose=true)
 
 Run nested cross-validation for NCPLS regression.
 
@@ -279,17 +281,19 @@ The matrix method expects a numeric response block `Y`; the vector method is a c
 wrapper for univariate regression and reshapes `y` to a one-column matrix. The return
 value is the same tuple as [`nestedcv`](@ref): the outer-fold scores and the selected
 number of latent variables per outer fold. Component counts are selected from
-`1:spec.ncomponents`.
+`1:spec.ncomponents` by default. Set `select_ncomponents=false` to use
+`spec.ncomponents` as a fixed count and skip the inner folds.
 """
 function cvreg(
     X::AbstractArray{<:Real},
     Y::AbstractMatrix{<:Real};
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -309,6 +313,7 @@ function cvreg(
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
         max_components=spec.ncomponents,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,
@@ -320,10 +325,11 @@ function cvreg(
     y::AbstractVector{<:Real};
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -337,6 +343,7 @@ function cvreg(
         num_outer_folds_repeats=num_outer_folds_repeats,
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,
@@ -344,14 +351,14 @@ function cvreg(
 end
 
 """
-    permreg(X, Y; spec, fit_kwargs=(;), num_permutations=999, num_outer_folds=8,
-            num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
-            num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
-            rng=Random.GLOBAL_RNG, verbose=true)
-    permreg(X, y; spec, fit_kwargs=(;), num_permutations=999, num_outer_folds=8,
-            num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
-            num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
-            rng=Random.GLOBAL_RNG, verbose=true)
+    permreg(X, Y; spec, fit_kwargs=(;), num_permutations=999, num_outer_folds=5,
+            num_outer_folds_repeats=num_outer_folds, num_inner_folds=4,
+            num_inner_folds_repeats=num_inner_folds, select_ncomponents=true,
+            reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
+    permreg(X, y; spec, fit_kwargs=(;), num_permutations=999, num_outer_folds=5,
+            num_outer_folds_repeats=num_outer_folds, num_inner_folds=4,
+            num_inner_folds_repeats=num_inner_folds, select_ncomponents=true,
+            reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
 
 Run a permutation test around nested NCPLS regression cross-validation.
 
@@ -359,7 +366,8 @@ The matrix method expects a numeric response block `Y`; the vector method is a
 convenience wrapper for univariate regression. The returned vector contains one
 cross-validation score for each permutation and can be compared to the observed score
 from [`cvreg`](@ref), for example via [`pvalue`](@ref). Component counts are selected
-from `1:spec.ncomponents`.
+from `1:spec.ncomponents` by default. Set `select_ncomponents=false` to use
+`spec.ncomponents` as a fixed count and skip the inner folds.
 """
 function permreg(
     X::AbstractArray{<:Real},
@@ -367,10 +375,11 @@ function permreg(
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
     num_permutations::Integer=999,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -391,6 +400,7 @@ function permreg(
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
         max_components=spec.ncomponents,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,
@@ -403,10 +413,11 @@ function permreg(
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
     num_permutations::Integer=999,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -421,6 +432,7 @@ function permreg(
         num_outer_folds_repeats=num_outer_folds_repeats,
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,
@@ -428,14 +440,15 @@ function permreg(
 end
 
 """
-    cvda(X, Y; spec, fit_kwargs=(;), weighted=true, num_outer_folds=8,
-         num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
-         num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
-         rng=Random.GLOBAL_RNG, verbose=true)
-    cvda(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;), weighted=true,
-         num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
-         num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
+    cvda(X, Y; spec, fit_kwargs=(;), weighted=true, num_outer_folds=5,
+         num_outer_folds_repeats=num_outer_folds, num_inner_folds=4,
+         num_inner_folds_repeats=num_inner_folds, select_ncomponents=true,
          reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
+    cvda(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;), weighted=true,
+         num_outer_folds=5, num_outer_folds_repeats=num_outer_folds,
+         num_inner_folds=4, num_inner_folds_repeats=num_inner_folds,
+         select_ncomponents=true, reshuffle_outer_folds=false,
+         rng=Random.GLOBAL_RNG, verbose=true)
 
 Run nested cross-validation for NCPLS discriminant analysis.
 
@@ -445,7 +458,9 @@ one-hot form. Outer and inner folds are stratified by class. The return value is
 tuple as [`nestedcv`](@ref): the outer-fold classification scores and the selected number
 of latent variables per outer fold. Mixed response blocks with additional continuous
 columns are not supported by this helper; use [`nestedcv`](@ref) directly with custom
-callbacks in that case. Component counts are selected from `1:spec.ncomponents`.
+callbacks in that case. Component counts are selected from `1:spec.ncomponents` by
+default. Set `select_ncomponents=false` to use `spec.ncomponents` as a fixed count and
+skip the inner folds.
 """
 function cvda(
     X::AbstractArray{<:Real},
@@ -453,10 +468,11 @@ function cvda(
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
     weighted::Bool=true,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -477,6 +493,7 @@ function cvda(
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
         max_components=spec.ncomponents,
+        select_ncomponents=select_ncomponents,
         strata=sampleclasses(Y),
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
@@ -490,10 +507,11 @@ function cvda(
     spec::NCPLSModel,
     fit_kwargs::NamedTuple=(;),
     weighted::Bool=true,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -511,6 +529,7 @@ function cvda(
         num_outer_folds_repeats=num_outer_folds_repeats,
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,
@@ -529,14 +548,15 @@ end
 
 """
     permda(X, Y; spec, fit_kwargs=(;), weighted=true, num_permutations=999,
-           num_outer_folds=8, num_outer_folds_repeats=num_outer_folds,
-           num_inner_folds=7, num_inner_folds_repeats=num_inner_folds,
-           reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
-    permda(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;), weighted=true,
-           num_permutations=999, num_outer_folds=8,
-           num_outer_folds_repeats=num_outer_folds, num_inner_folds=7,
-           num_inner_folds_repeats=num_inner_folds, reshuffle_outer_folds=false,
+           num_outer_folds=5, num_outer_folds_repeats=num_outer_folds,
+           num_inner_folds=4, num_inner_folds_repeats=num_inner_folds,
+           select_ncomponents=true, reshuffle_outer_folds=false,
            rng=Random.GLOBAL_RNG, verbose=true)
+    permda(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;), weighted=true,
+           num_permutations=999, num_outer_folds=5,
+           num_outer_folds_repeats=num_outer_folds, num_inner_folds=4,
+           num_inner_folds_repeats=num_inner_folds, select_ncomponents=true,
+           reshuffle_outer_folds=false, rng=Random.GLOBAL_RNG, verbose=true)
 
 Run a permutation test around nested NCPLS discriminant-analysis cross-validation.
 
@@ -546,7 +566,9 @@ one-hot form. The returned vector contains one cross-validation score for each
 permutation and can be compared to the observed score from [`cvda`](@ref), for example
 via [`pvalue`](@ref). Mixed response blocks with additional continuous columns are not
 supported by this helper; use [`nestedcvperm`](@ref) directly with custom callbacks in
-that case. Component counts are selected from `1:spec.ncomponents`.
+that case. Component counts are selected from `1:spec.ncomponents` by default. Set
+`select_ncomponents=false` to use `spec.ncomponents` as a fixed count and skip the inner
+folds.
 """
 function permda(
     X::AbstractArray{<:Real},
@@ -555,10 +577,11 @@ function permda(
     fit_kwargs::NamedTuple=(;),
     weighted::Bool=true,
     num_permutations::Integer=999,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -580,6 +603,7 @@ function permda(
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
         max_components=spec.ncomponents,
+        select_ncomponents=select_ncomponents,
         strata=sampleclasses(Y),
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
@@ -594,10 +618,11 @@ function permda(
     fit_kwargs::NamedTuple=(;),
     weighted::Bool=true,
     num_permutations::Integer=999,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
+    select_ncomponents::Bool=true,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
@@ -616,6 +641,7 @@ function permda(
         num_outer_folds_repeats=num_outer_folds_repeats,
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,
@@ -636,6 +662,10 @@ end
     nestedcv(X, Y; ...)
 
 Run explicit nested cross-validation for NCPLS.
+
+With the default `select_ncomponents=true`, the inner folds select a component count
+from `1:max_components` for each outer fold. With `select_ncomponents=false`,
+`spec.ncomponents` is used as a fixed component count and the inner folds are skipped.
 """
 function nestedcv(
     X::AbstractArray{<:Real},
@@ -645,12 +675,13 @@ function nestedcv(
     obs_weight_fn::Union{Function, Nothing}=nothing,
     score_fn::Function,
     predict_fn::Function,
-    select_fn::Function,
-    num_outer_folds::Integer=8,
+    select_fn::Union{Function, Nothing}=nothing,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
     max_components::Integer=spec.ncomponents,
+    select_ncomponents::Bool=true,
     strata::Union{AbstractVector, Nothing}=nothing,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
@@ -658,15 +689,19 @@ function nestedcv(
 )
     num_outer_folds_repeats > 0 || throw(ArgumentError(
         "The number of outer folds must be greater than zero"))
-    num_inner_folds_repeats > 0 || throw(ArgumentError(
-        "The number of inner folds must be greater than zero"))
     reshuffle_outer_folds || num_outer_folds_repeats ≤ num_outer_folds || throw(ArgumentError(
         "The number of outer fold repeats cannot exceed the number of outer folds unless " *
         "reshuffle_outer_folds=true"))
-    num_inner_folds_repeats ≤ num_inner_folds || throw(ArgumentError(
-        "The number of inner fold repeats cannot exceed the number of inner folds"))
-    max_components > 0 || throw(ArgumentError(
-        "The number of components must be greater than zero"))
+    if select_ncomponents
+        isnothing(select_fn) && throw(ArgumentError(
+            "select_fn must be provided when select_ncomponents=true"))
+        num_inner_folds_repeats > 0 || throw(ArgumentError(
+            "The number of inner folds must be greater than zero"))
+        num_inner_folds_repeats ≤ num_inner_folds || throw(ArgumentError(
+            "The number of inner fold repeats cannot exceed the number of inner folds"))
+        max_components > 0 || throw(ArgumentError(
+            "The number of components must be greater than zero"))
+    end
 
     n_samples = size(X, 1)
     size(Y, 1) == n_samples || throw(DimensionMismatch("Row count mismatch between X and Y"))
@@ -707,23 +742,27 @@ function nestedcv(
 
         fold_kwargs = ensure_response_labels(fold_kwargs, Y_train)
 
-        best_k = optimize_num_latent_variables(
-            X_train,
-            Y_train,
-            max_components,
-            num_inner_folds,
-            num_inner_folds_repeats,
-            spec,
-            base_fold_kwargs,
-            obs_weight_fn,
-            score_fn,
-            predict_fn,
-            select_fn,
-            rng,
-            verbose;
-            strata=inner_strata,
-            sample_indices=train_indices,
-        )
+        best_k = if select_ncomponents
+            optimize_num_latent_variables(
+                X_train,
+                Y_train,
+                max_components,
+                num_inner_folds,
+                num_inner_folds_repeats,
+                spec,
+                base_fold_kwargs,
+                obs_weight_fn,
+                score_fn,
+                predict_fn,
+                select_fn,
+                rng,
+                verbose;
+                strata=inner_strata,
+                sample_indices=train_indices,
+            )
+        else
+            spec.ncomponents
+        end
         optimal_num_latent_variables[outer_fold_idx] = best_k
 
         final_model = fit_ncpls_light(
@@ -746,7 +785,8 @@ end
 """
     nestedcvperm(X, Y; ...)
 
-Run a permutation test around `nestedcv`.
+Run a permutation test around `nestedcv`. The `select_ncomponents` keyword is forwarded
+to each permuted [`nestedcv`](@ref) run.
 """
 function nestedcvperm(
     X::AbstractArray{<:Real},
@@ -756,13 +796,14 @@ function nestedcvperm(
     obs_weight_fn::Union{Function, Nothing}=nothing,
     score_fn::Function,
     predict_fn::Function,
-    select_fn::Function,
+    select_fn::Union{Function, Nothing}=nothing,
     num_permutations::Integer=999,
-    num_outer_folds::Integer=8,
+    num_outer_folds::Integer=5,
     num_outer_folds_repeats::Integer=num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
     max_components::Integer=spec.ncomponents,
+    select_ncomponents::Bool=true,
     strata::Union{AbstractVector, Nothing}=nothing,
     reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
@@ -798,6 +839,7 @@ function nestedcvperm(
             num_inner_folds=num_inner_folds,
             num_inner_folds_repeats=num_inner_folds_repeats,
             max_components=max_components,
+            select_ncomponents=select_ncomponents,
             strata=strata_perm,
             reshuffle_outer_folds=reshuffle_outer_folds,
             rng=rng,
@@ -811,18 +853,39 @@ end
 
 """
     outlierscan(X, Y; spec, fit_kwargs=(;), obs_weight_fn=default_da_obs_weight_fn,
-                weighted=true, num_outer_folds=8,
-                num_outer_folds_repeats=10*num_outer_folds, ...)
+                weighted=true, num_outer_folds=5,
+                num_outer_folds_repeats=num_outer_folds, num_inner_folds=4,
+                num_inner_folds_repeats=num_inner_folds,
+                select_ncomponents=true, reshuffle_outer_folds=false, ...)
     outlierscan(X, sample_labels::AbstractCategoricalArray; spec, fit_kwargs=(;),
                 obs_weight_fn=default_da_obs_weight_fn, weighted=true,
-                num_outer_folds=8, num_outer_folds_repeats=10*num_outer_folds, ...)
+                num_outer_folds=5, num_outer_folds_repeats=num_outer_folds,
+                num_inner_folds=4, num_inner_folds_repeats=num_inner_folds,
+                select_ncomponents=true, reshuffle_outer_folds=false, ...)
 
-Run repeated nested discriminant-analysis CV and count how often each sample is flagged.
+Run discriminant-analysis CV, optionally repeated, and count how often each sample is flagged.
 The response must be an `AbstractCategoricalArray` of class labels or a pure one-hot
 class-indicator matrix; mixed response blocks with additional continuous columns are not
-supported here. `weighted` controls the class-balanced score used to choose the number
-of components in the inner CV; final outlier flags are still raw per-sample
-misclassifications. Component counts are selected from `1:spec.ncomponents`.
+supported here.
+
+`num_outer_folds` controls the size of each held-out test set. With the default
+`num_outer_folds=5`, each outer split trains on about four fifths of the samples and
+predicts the remaining fifth. With the default `reshuffle_outer_folds=false`, one outer
+partition is reused and `num_outer_folds_repeats=num_outer_folds`, so the default is the
+usual single 5-fold pass in which each fold serves once as the test set.
+
+Set `reshuffle_outer_folds=true` to run repeated random outer holdouts. In that mode,
+`outlierscan` draws a fresh outer partition for every repeat and uses one held-out fold
+from that partition. Larger repeat counts are useful when the goal is to estimate how
+consistently each sample is misclassified; for example,
+`num_outer_folds_repeats=10*num_outer_folds` gives each sample about ten expected
+held-out predictions. Exact per-sample counts are returned in `n_tested`.
+
+When `select_ncomponents=true`, each outer training set runs an inner CV to choose the
+component count from `1:spec.ncomponents`. `weighted` controls the class-balanced score
+used for that inner selection; final outlier flags are still raw per-sample
+misclassifications. Set `select_ncomponents=false` to use `spec.ncomponents` as a fixed
+count and skip the inner folds.
 """
 function outlierscan(
     X::AbstractArray{<:Real},
@@ -831,11 +894,12 @@ function outlierscan(
     fit_kwargs::NamedTuple=(;),
     obs_weight_fn::Union{Function, Nothing}=default_da_obs_weight_fn,
     weighted::Bool=true,
-    num_outer_folds::Integer=8,
-    num_outer_folds_repeats::Integer=10 * num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_outer_folds::Integer=5,
+    num_outer_folds_repeats::Integer=num_outer_folds,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
-    reshuffle_outer_folds::Bool=true,
+    select_ncomponents::Bool=true,
+    reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
 )
@@ -850,6 +914,12 @@ function outlierscan(
     reshuffle_outer_folds || num_outer_folds_repeats ≤ num_outer_folds || throw(ArgumentError(
         "The number of outer fold repeats cannot exceed the number of outer folds unless " *
         "reshuffle_outer_folds=true"))
+    if select_ncomponents
+        num_inner_folds_repeats > 0 || throw(ArgumentError(
+            "The number of inner folds must be greater than zero"))
+        num_inner_folds_repeats ≤ num_inner_folds || throw(ArgumentError(
+            "The number of inner fold repeats cannot exceed the number of inner folds"))
+    end
 
     fixed_folds = reshuffle_outer_folds ? nothing :
         build_folds(n_samples, num_outer_folds, rng; strata=strata)
@@ -880,23 +950,27 @@ function outlierscan(
         )
         fold_kwargs = ensure_response_labels(fold_kwargs, Y_train)
 
-        best_k = optimize_num_latent_variables(
-            X_train,
-            Y_train,
-            spec.ncomponents,
-            num_inner_folds,
-            num_inner_folds_repeats,
-            spec,
-            base_fold_kwargs,
-            obs_weight_fn,
-            cb.score_fn,
-            cb.predict_fn,
-            cb.select_fn,
-            rng,
-            verbose;
-            strata=strata[train_indices],
-            sample_indices=train_indices,
-        )
+        best_k = if select_ncomponents
+            optimize_num_latent_variables(
+                X_train,
+                Y_train,
+                spec.ncomponents,
+                num_inner_folds,
+                num_inner_folds_repeats,
+                spec,
+                base_fold_kwargs,
+                obs_weight_fn,
+                cb.score_fn,
+                cb.predict_fn,
+                cb.select_fn,
+                rng,
+                verbose;
+                strata=strata[train_indices],
+                sample_indices=train_indices,
+            )
+        else
+            spec.ncomponents
+        end
 
         final_model = fit_ncpls_light(
             with_n_components(spec, best_k),
@@ -924,11 +998,12 @@ function outlierscan(
     fit_kwargs::NamedTuple=(;),
     obs_weight_fn::Union{Function, Nothing}=default_da_obs_weight_fn,
     weighted::Bool=true,
-    num_outer_folds::Integer=8,
-    num_outer_folds_repeats::Integer=10 * num_outer_folds,
-    num_inner_folds::Integer=7,
+    num_outer_folds::Integer=5,
+    num_outer_folds_repeats::Integer=num_outer_folds,
+    num_inner_folds::Integer=4,
     num_inner_folds_repeats::Integer=num_inner_folds,
-    reshuffle_outer_folds::Bool=true,
+    select_ncomponents::Bool=true,
+    reshuffle_outer_folds::Bool=false,
     rng::AbstractRNG=Random.GLOBAL_RNG,
     verbose::Bool=true,
 ) where {T,R,V,C,U}
@@ -944,6 +1019,7 @@ function outlierscan(
         num_outer_folds_repeats=num_outer_folds_repeats,
         num_inner_folds=num_inner_folds,
         num_inner_folds_repeats=num_inner_folds_repeats,
+        select_ncomponents=select_ncomponents,
         reshuffle_outer_folds=reshuffle_outer_folds,
         rng=rng,
         verbose=verbose,

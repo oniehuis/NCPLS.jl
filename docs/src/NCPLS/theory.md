@@ -52,10 +52,10 @@ object is then refolded and approximated by the structured form above.
 
 ## Main Algorithmic Steps
 
-Each component is built in four steps: 1) inference of response-specific predictor
-directions, 2) selection of the optimal linear combination of these directions by CCA,
-3) optional compression of the resulting predictor-side weight object to a multilinear
-rank-1 form, and 4) extraction of an orthogonal score vector. In the description below,
+Each component is built in four steps: (1) inference of response-specific predictor
+directions, (2) selection of the optimal linear combination of these directions by CCA,
+(3) optional compression of the resulting predictor-side weight object to a multilinear
+rank-1 form, and (4) extraction of an orthogonal score vector. In the description below,
 $X$ denotes the preprocessed predictor tensor and $Y$ denotes the current deflated
 working copy of the preprocessed primary-response matrix. At the start of fitting,
 $Y = Y_{\mathrm{prim}}$. Under the default settings, this means centered $X$ and centered

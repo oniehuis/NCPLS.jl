@@ -28,7 +28,9 @@ number of components and applied to the outer test set.
 
 The convenience wrappers [`cvreg`](@ref), [`permreg`](@ref), [`cvda`](@ref),
 [`permda`](@ref), and [`outlierscan`](@ref) use `spec.ncomponents` as this maximum
-component count.
+component count. If you already know the component count, pass
+`select_ncomponents=false`; then `spec.ncomponents` is used as a fixed count and the
+inner folds are skipped.
 
 The return value of `nestedcv` is a pair `(scores, best_components)`:
 
@@ -132,6 +134,22 @@ observed_rmse = mean(reg_scores)
     outer_scores=round.(reg_scores; digits=3),
     best_components=reg_best_components,
     mean_outer_score=round(observed_rmse; digits=3),
+)
+```
+
+When the component count has already been chosen elsewhere, the inner model-selection
+loop can be skipped:
+
+```julia
+fixed_scores, fixed_components = cvreg(
+    data.X,
+    data.Yprim_reg[:, 1];
+    spec=spec,
+    fit_kwargs=fit_kwargs,
+    select_ncomponents=false,
+    num_outer_folds=4,
+    num_outer_folds_repeats=4,
+    verbose=false,
 )
 ```
 
@@ -276,6 +294,7 @@ function dominant_wrong_predictions(
     num_outer_folds_repeats=20,
     num_inner_folds=3,
     num_inner_folds_repeats=3,
+    select_ncomponents=true,
     reshuffle_outer_folds=true,
     rng=MersenneTwister(54321),
     verbose=false,
@@ -313,23 +332,27 @@ function dominant_wrong_predictions(
         )
         fold_kwargs = NCPLS.ensure_response_labels(fold_kwargs, Y_train)
 
-        best_k = NCPLS.optimize_num_latent_variables(
-            X_train,
-            Y_train,
-            spec.ncomponents,
-            num_inner_folds,
-            num_inner_folds_repeats,
-            spec,
-            base_fold_kwargs,
-            NCPLS.default_da_obs_weight_fn,
-            cb.score_fn,
-            cb.predict_fn,
-            cb.select_fn,
-            rng,
-            verbose;
-            strata=sample_labels[train_indices],
-            sample_indices=train_indices,
-        )
+        best_k = if select_ncomponents
+            NCPLS.optimize_num_latent_variables(
+                X_train,
+                Y_train,
+                spec.ncomponents,
+                num_inner_folds,
+                num_inner_folds_repeats,
+                spec,
+                base_fold_kwargs,
+                NCPLS.default_da_obs_weight_fn,
+                cb.score_fn,
+                cb.predict_fn,
+                cb.select_fn,
+                rng,
+                verbose;
+                strata=sample_labels[train_indices],
+                sample_indices=train_indices,
+            )
+        else
+            spec.ncomponents
+        end
 
         final_model = NCPLS.fit_ncpls_light(
             NCPLS.with_n_components(spec, best_k),
@@ -371,10 +394,10 @@ outlier_scan = outlierscan(
     data.sampleclasses;
     spec=spec,
     fit_kwargs=fit_kwargs,
+    select_ncomponents=false,
     num_outer_folds=4,
     num_outer_folds_repeats=20,
-    num_inner_folds=3,
-    num_inner_folds_repeats=3,
+    reshuffle_outer_folds=true,
     rng=MersenneTwister(54321),
     verbose=false,
 )
@@ -387,8 +410,8 @@ wrong_prediction_summary = dominant_wrong_predictions(
     fit_kwargs=fit_kwargs,
     num_outer_folds=4,
     num_outer_folds_repeats=20,
-    num_inner_folds=3,
-    num_inner_folds_repeats=3,
+    select_ncomponents=false,
+    reshuffle_outer_folds=true,
     rng=MersenneTwister(54321),
     verbose=false,
 )
