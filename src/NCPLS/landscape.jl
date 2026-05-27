@@ -403,13 +403,13 @@ end
 
 const _require_landscape_extension_ref = Ref{Function}(_require_landscape_extension)
 const _landscapeplot_plotly_ref = Ref{Function}(
-    (mf; kwargs...) -> landscapeplot_plotly(mf; kwargs...)
+    (mf; kwargs...) -> Base.invokelatest(landscapeplot_plotly, mf; kwargs...)
 )
 const _weightlandscapeplot_plotly_ref = Ref{Function}(
-    (mf; kwargs...) -> weightlandscapeplot_plotly(mf; kwargs...)
+    (mf; kwargs...) -> Base.invokelatest(weightlandscapeplot_plotly, mf; kwargs...)
 )
 const _weightprofilesplot_plotly_ref = Ref{Function}(
-    (mf; kwargs...) -> weightprofilesplot_plotly(mf; kwargs...)
+    (mf; kwargs...) -> Base.invokelatest(weightprofilesplot_plotly, mf; kwargs...)
 )
 
 function landscapeplot(
