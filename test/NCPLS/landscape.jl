@@ -322,9 +322,9 @@ end
 end
 
 @testset "landscape extension guard accepts loaded extensions" begin
-    if !isnothing(Base.find_package("CairoMakie"))
+    if !isnothing(Base.find_package("Makie"))
         try
-            @eval using CairoMakie
+            @eval using Makie
             @test NCPLS._require_landscape_extension(:MakieExtension, "Makie") === nothing
         catch
         end

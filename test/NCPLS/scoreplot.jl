@@ -107,7 +107,7 @@ end
 end
 
 const _SCOREPLOT_PLOTLYJS_AVAILABLE = Ref{Union{Nothing, Bool}}(nothing)
-const _SCOREPLOT_CAIROMAKIE_AVAILABLE = Ref{Union{Nothing, Bool}}(nothing)
+const _SCOREPLOT_MAKIE_AVAILABLE = Ref{Union{Nothing, Bool}}(nothing)
 
 function scoreplot_backend_available(ref::Ref{Union{Nothing, Bool}}, pkg::Symbol)
     cached = ref[]
@@ -180,7 +180,7 @@ end
 end
 
 @testset "scoreplot makie smoke test" begin
-    if scoreplot_backend_available(_SCOREPLOT_CAIROMAKIE_AVAILABLE, :CairoMakie)
+    if scoreplot_backend_available(_SCOREPLOT_MAKIE_AVAILABLE, :Makie)
         MakieExt = Base.get_extension(NCPLS, :MakieExtension)
         @test MakieExt !== nothing
         @test NCPLS._require_extension(:MakieExtension, "Makie") === nothing
