@@ -384,6 +384,27 @@ end
     @test only(FakeMakie.legend_calls[]).kwargs == (position = :rt,)
     @test only(FakeMakie.inspector_calls[]).kwargs == (enabled = true,)
 
+    FakeMakie.reset!()
+    nothing_fig = NCPLS.scoreplot_makie(
+        samples,
+        groups,
+        scores;
+        figure_kwargs = nothing,
+        axis_kwargs = nothing,
+        default_scatter = nothing,
+        default_trace = nothing,
+        default_marker = nothing,
+        legend_kwargs = nothing,
+        inspector_kwargs = nothing,
+        show_legend = true,
+        show_inspector = true,
+    )
+
+    @test nothing_fig isa FakeMakie.Figure
+    @test nothing_fig.kwargs == (;)
+    @test only(FakeMakie.legend_calls[]).kwargs == (;)
+    @test only(FakeMakie.inspector_calls[]).kwargs == (;)
+
     @test_throws ErrorException NCPLS.scoreplot_makie(samples, groups, scores[:, 1:1])
 end
 

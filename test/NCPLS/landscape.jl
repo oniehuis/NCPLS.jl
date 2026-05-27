@@ -541,6 +541,14 @@ end
     @test positive_weight_plot.layout === custom_layout
     @test positive_weight_plot.kwargs == (config = :weights,)
 
+    positive_weight_no_kwargs = NCPLS.weightlandscapeplot_plotly(
+        mf;
+        lv = :combined,
+        layout = custom_layout,
+        plot_kwargs = nothing,
+    )
+    @test positive_weight_no_kwargs.kwargs == (;)
+
     signed_mf = mock_landscape_fit(predictoraxes = axes)
     signed_mf.W[1, 1, 1] = -1.0
     signed_mf.W[1, 2, 1] = 2.0
