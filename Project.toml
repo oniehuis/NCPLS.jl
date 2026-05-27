@@ -21,7 +21,7 @@ PlotlyJSExtension = "PlotlyJS"
 
 [compat]
 CategoricalArrays = "0.10, 1"
-Makie = "0.24"
+Makie = "0.23, 0.24"
 PlotlyJS = "0.18"
 Reexport = "1"
 Statistics = "1"
