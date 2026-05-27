@@ -534,11 +534,12 @@ end
         hovertemplate = "W",
         title = "Weights",
         layout = custom_layout,
-        plot_kwargs = nothing,
+        plot_kwargs = Dict("config" => :weights),
     )
     @test positive_weight_plot.data[1][:colorscale] == "Cividis"
     @test positive_weight_plot.data[1][:zmin] == 0.0
     @test positive_weight_plot.layout === custom_layout
+    @test positive_weight_plot.kwargs == (config = :weights,)
 
     signed_mf = mock_landscape_fit(predictoraxes = axes)
     signed_mf.W[1, 1, 1] = -1.0

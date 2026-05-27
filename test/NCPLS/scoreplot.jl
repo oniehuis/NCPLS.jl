@@ -277,6 +277,116 @@ end
     end
 end
 
+module FakeScoreMakieExtension
+
+using CategoricalArrays
+import NCPLS
+
+module GLMakie end
+
+const _current_backend_ref = Ref{Function}(() -> missing)
+
+module Makie
+
+mutable struct Figure
+    kwargs::NamedTuple
+end
+Figure(; kwargs...) = Figure((; kwargs...))
+Base.getindex(fig::Figure, row::Integer, col::Integer) = (fig, row, col)
+
+struct Axis
+    slot
+    kwargs::NamedTuple
+end
+Axis(slot; kwargs...) = Axis(slot, (; kwargs...))
+
+const scatter_calls = Ref{Vector{Any}}(Any[])
+const legend_calls = Ref{Vector{Any}}(Any[])
+const inspector_calls = Ref{Vector{Any}}(Any[])
+
+function reset!()
+    scatter_calls[] = Any[]
+    legend_calls[] = Any[]
+    inspector_calls[] = Any[]
+    nothing
+end
+
+function scatter!(ax::Axis, xs, ys; kwargs...)
+    push!(
+        scatter_calls[],
+        (axis = ax, x = collect(xs), y = collect(ys), kwargs = (; kwargs...)),
+    )
+    nothing
+end
+
+function axislegend(ax::Axis; kwargs...)
+    push!(legend_calls[], (axis = ax, kwargs = (; kwargs...)))
+    nothing
+end
+
+function DataInspector(fig::Figure; kwargs...)
+    push!(inspector_calls[], (figure = fig, kwargs = (; kwargs...)))
+    nothing
+end
+
+end
+
+include(joinpath(@__DIR__, "..", "..", "ext", "makie_extensions", "scoreplot.jl"))
+
+end
+
+@testset "scoreplot makie extension logic with fake backend" begin
+    FakeMakie = FakeScoreMakieExtension.Makie
+    FakeMakie.reset!()
+    FakeScoreMakieExtension._current_backend_ref[] = () -> FakeScoreMakieExtension.GLMakie
+
+    samples = ["s1", "s2", "s3"]
+    groups = [:a, :b, :a]
+    scores = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+
+    fig = NCPLS.scoreplot_makie(
+        samples,
+        groups,
+        scores;
+        group_order = [:b, :missing, :a],
+        figure_kwargs = Dict("size" => (240, 160)),
+        axis_kwargs = Dict("xlabel" => "Custom LV1"),
+        default_scatter = Dict("color" => :red),
+        default_trace = Dict(:alpha => 0.5),
+        default_marker = Dict("marker" => :circle),
+        group_scatter = Dict("a" => Dict("markersize" => 7)),
+        group_trace = Dict(:b => Dict("label" => "Bee")),
+        group_marker = Dict("a" => Dict("color" => :blue, :strokewidth => 2)),
+        legend_kwargs = Dict("position" => :rt),
+        inspector_kwargs = Dict("enabled" => true),
+    )
+
+    @test fig isa FakeMakie.Figure
+    @test fig.kwargs == (size = (240, 160),)
+
+    @test length(FakeMakie.scatter_calls[]) == 2
+    bee_call, a_call = FakeMakie.scatter_calls[]
+
+    @test bee_call.axis.kwargs.xlabel == "Custom LV1"
+    @test bee_call.x == [3.0]
+    @test bee_call.kwargs.label == "Bee"
+    @test bee_call.kwargs.color == :red
+    @test bee_call.kwargs.alpha == 0.5
+    @test bee_call.kwargs.marker == :circle
+    @test bee_call.kwargs.inspectable === true
+
+    @test a_call.x == [1.0, 5.0]
+    @test a_call.kwargs.label == "a"
+    @test a_call.kwargs.color == :blue
+    @test a_call.kwargs.markersize == 7
+    @test a_call.kwargs.strokewidth == 2
+
+    @test only(FakeMakie.legend_calls[]).kwargs == (position = :rt,)
+    @test only(FakeMakie.inspector_calls[]).kwargs == (enabled = true,)
+
+    @test_throws ErrorException NCPLS.scoreplot_makie(samples, groups, scores[:, 1:1])
+end
+
 module FakeScorePlotlyExtension
 
 using CategoricalArrays
