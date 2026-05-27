@@ -322,7 +322,7 @@ Base.@doc LANDSCAPEPLOT_DOC landscapeplot
 
 function landscapeplot_plotly end
 function landscapeplot_plotly(mf::AbstractNCPLSFit; kwargs...)
-    _require_landscape_extension(:PlotlyJSExtension, "PlotlyJS")
+    _require_landscape_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
     error("Unreachable")
 end
 
@@ -359,7 +359,7 @@ Base.@doc WEIGHTLANDSCAPEPLOT_DOC weightlandscapeplot
 
 function weightlandscapeplot_plotly end
 function weightlandscapeplot_plotly(mf::AbstractNCPLSFit; kwargs...)
-    _require_landscape_extension(:PlotlyJSExtension, "PlotlyJS")
+    _require_landscape_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
     error("Unreachable")
 end
 
@@ -391,7 +391,7 @@ Base.@doc WEIGHTPROFILESPLOT_DOC weightprofilesplot
 
 function weightprofilesplot_plotly end
 function weightprofilesplot_plotly(mf::AbstractNCPLSFit; kwargs...)
-    _require_landscape_extension(:PlotlyJSExtension, "PlotlyJS")
+    _require_landscape_extension_ref[](:PlotlyJSExtension, "PlotlyJS")
     error("Unreachable")
 end
 

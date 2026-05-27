@@ -27,3 +27,34 @@
     @test isfinite(rho)
     @test isfinite(rhow)
 end
+
+@testset "cca_decomposition rejects rank-zero inputs" begin
+    X = Float64[
+        1 0
+        0 1
+        1 1
+    ]
+    Y = Float64[
+        1 2
+        3 4
+        5 6
+    ]
+
+    err_x = try
+        NCPLS.cca_decomposition(zeros(3, 2), Y)
+        nothing
+    catch err
+        err
+    end
+    @test err_x isa ErrorException
+    @test occursin("X has rank 0", sprint(showerror, err_x))
+
+    err_y = try
+        NCPLS.cca_decomposition(X, zeros(3, 2))
+        nothing
+    catch err
+        err
+    end
+    @test err_y isa ErrorException
+    @test occursin("Y has rank 0", sprint(showerror, err_y))
+end

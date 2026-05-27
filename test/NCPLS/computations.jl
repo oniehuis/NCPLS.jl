@@ -698,6 +698,36 @@ end
     @test occursin("Zero tensor not supported.", sprint(showerror, err))
 end
 
+@testset "parafac_rank1 rejects invalid raw multilinear initialization" begin
+    model = NCPLS.NCPLSModel(
+        1,
+        true,
+        false,
+        true,
+        true,
+        false,
+        10,
+        1e-10,
+        :bad,
+        1,
+    )
+    X = reshape(collect(1.0:8.0), 2, 2, 2)
+
+    err = try
+        NCPLS.parafac_rank1(
+            X,
+            model,
+            Random.MersenneTwister(model.multilinear_seed),
+        )
+        nothing
+    catch err
+        err
+    end
+
+    @test err isa ErrorException
+    @test occursin("Unknown init = bad", sprint(showerror, err))
+end
+
 @testset "multilinear_weights handles vector, matrix, and tensor inputs" begin
     model = NCPLS.NCPLSModel(multilinear = true)
     rng = Random.MersenneTwister(model.multilinear_seed)

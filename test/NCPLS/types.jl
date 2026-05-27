@@ -159,6 +159,18 @@ end
     @test occursin("multilinear_init: random", plain)
 end
 
+@testset "PredictorAxis keyword constructor and show method" begin
+    axis = NCPLS.PredictorAxis(name = "RT", values = [1.0, 2.0], unit = "min")
+
+    @test axis.name == "RT"
+    @test axis.values == [1.0, 2.0]
+    @test axis.unit == "min"
+    shown = sprint(show, axis)
+    @test occursin("PredictorAxis", shown)
+    @test occursin("RT", shown)
+    @test occursin("length=2", shown)
+end
+
 @testset "NCPLSFit stores fitted state and optional metadata" begin
     matrix_mf = mock_matrix_fit()
     @test matrix_mf isa NCPLS.NCPLSFit

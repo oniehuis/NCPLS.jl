@@ -81,6 +81,12 @@ end
         @test res[3] == NCPLS.sampleclasses(mf)
         @test res[4] == mf.T[:, 1:2]
 
+        res = NCPLS.scoreplot(mf; backend = :makie)
+        @test res[1] == :makie
+        @test res[2] == NCPLS.samplelabels(mf)
+        @test res[3] == NCPLS.sampleclasses(mf)
+        @test res[4] == mf.T[:, 1:2]
+
         mf_no_groups = mock_scoreplot_fit(sampleclasses = nothing)
         @test_throws ArgumentError NCPLS.scoreplot(mf_no_groups; backend = :plotly)
         @test_throws ErrorException NCPLS.scoreplot(mf; backend = :unknown)
@@ -100,10 +106,30 @@ end
     )
 end
 
-@testset "scoreplot plotly smoke test" begin
-    if !isnothing(Base.find_package("PlotlyJS"))
-        @eval using PlotlyJS
+const _SCOREPLOT_PLOTLYJS_AVAILABLE = Ref{Union{Nothing, Bool}}(nothing)
+const _SCOREPLOT_CAIROMAKIE_AVAILABLE = Ref{Union{Nothing, Bool}}(nothing)
 
+function scoreplot_backend_available(ref::Ref{Union{Nothing, Bool}}, pkg::Symbol)
+    cached = ref[]
+    cached isa Bool && return cached
+
+    available = if isnothing(Base.find_package(String(pkg)))
+        false
+    else
+        try
+            @eval using $pkg
+            true
+        catch
+            false
+        end
+    end
+
+    ref[] = available
+    available
+end
+
+@testset "scoreplot plotly smoke test" begin
+    if scoreplot_backend_available(_SCOREPLOT_PLOTLYJS_AVAILABLE, :PlotlyJS)
         mf = mock_scoreplot_fit(sampleclasses = NCPLS.categorical(["A", "A", "B", "B"]))
         plt = NCPLS.scoreplot(mf; backend = :plotly)
 
@@ -154,9 +180,7 @@ end
 end
 
 @testset "scoreplot makie smoke test" begin
-    if !isnothing(Base.find_package("CairoMakie"))
-        @eval using CairoMakie
-
+    if scoreplot_backend_available(_SCOREPLOT_CAIROMAKIE_AVAILABLE, :CairoMakie)
         MakieExt = Base.get_extension(NCPLS, :MakieExtension)
         @test MakieExt !== nothing
         @test NCPLS._require_extension(:MakieExtension, "Makie") === nothing
@@ -237,5 +261,115 @@ end
         @test res4 isa Figure
 
         set_backend(missing)
+
+        res5 = NCPLS.scoreplot_makie(
+            samples,
+            groups,
+            scores;
+            figure_kwargs = nothing,
+            axis_kwargs = nothing,
+            legend_kwargs = nothing,
+            inspector_kwargs = nothing,
+            show_legend = false,
+            show_inspector = false,
+        )
+        @test res5 isa Figure
     end
+end
+
+module FakeScorePlotlyExtension
+
+using CategoricalArrays
+import NCPLS
+
+module PlotlyJS
+
+abstract type AbstractTrace end
+
+struct Trace <: AbstractTrace
+    kind::Symbol
+    kwargs::NamedTuple
+end
+
+Base.getindex(trace::Trace, key::Symbol) = getproperty(trace, key)
+function Base.getproperty(trace::Trace, key::Symbol)
+    key in (:kind, :kwargs) && return getfield(trace, key)
+    get(trace.kwargs, key, nothing)
+end
+
+struct Layout
+    kwargs::NamedTuple
+end
+Layout(; kwargs...) = Layout((; kwargs...))
+
+struct Plot
+    data::Vector{AbstractTrace}
+    layout
+    kwargs::NamedTuple
+end
+
+attr(; kwargs...) = (; kwargs...)
+scatter(; kwargs...) = Trace(:scatter, (; kwargs...))
+plot(traces::Vector{<:AbstractTrace}, layout; kwargs...) =
+    Plot(AbstractTrace[traces...], layout, (; kwargs...))
+plot(trace::AbstractTrace, layout; kwargs...) =
+    Plot(AbstractTrace[trace], layout, (; kwargs...))
+
+end
+
+include(joinpath(@__DIR__, "..", "..", "ext", "plotly_extensions", "scoreplot.jl"))
+
+end
+
+@testset "scoreplot plotly extension logic with fake backend" begin
+    samples = ["s1", "s2", "s3"]
+    groups = [:a, :b, :a]
+    scores = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    FakePlotlyJS = FakeScorePlotlyExtension.PlotlyJS
+
+    default_plot = NCPLS.scoreplot_plotly(samples, groups, scores)
+    @test length(default_plot.data) == 2
+    @test default_plot.data[1][:name] == "a"
+    @test default_plot.data[1][:marker] == (;)
+    @test default_plot.layout.kwargs.title == "Scores"
+
+    custom_layout = FakePlotlyJS.Layout(title = "Custom")
+    cat_groups = NCPLS.categorical(["x", "y", "x"]; levels = ["x", "y", "z"])
+    custom_plot = NCPLS.scoreplot_plotly(
+        samples,
+        cat_groups,
+        scores;
+        default_trace = nothing,
+        default_marker = nothing,
+        group_marker = Dict("x" => Dict("color" => "green")),
+        layout = custom_layout,
+        plot_kwargs = nothing,
+    )
+    @test length(custom_plot.data) == 2
+    @test custom_plot.layout === custom_layout
+    @test custom_plot.kwargs == (;)
+    @test custom_plot.data[1][:marker] == (color = "green",)
+
+    marker_trace_plot = NCPLS.scoreplot_plotly(
+        samples,
+        groups,
+        scores;
+        group_order = [:b, :missing, :a],
+        default_trace = Dict("marker" => FakePlotlyJS.attr(color = "red")),
+        group_trace = Dict("b" => Dict("name" => "Bee", "hovertemplate" => "B")),
+        default_marker = Dict("size" => 9),
+        group_marker = Dict("a" => Dict("color" => "blue")),
+        show_legend = false,
+        plot_kwargs = Dict("config" => :cfg),
+    )
+    @test length(marker_trace_plot.data) == 2
+    @test marker_trace_plot.data[1][:name] == "Bee"
+    @test marker_trace_plot.data[1][:showlegend] === false
+    @test marker_trace_plot.data[2][:marker] == (color = "red",)
+    @test marker_trace_plot.kwargs == (config = :cfg,)
+
+    ref_plot = NCPLS._scoreplot_plotly_ref[](samples, groups, scores)
+    @test length(ref_plot.data) == 2
+
+    @test_throws ErrorException NCPLS.scoreplot_plotly(samples, groups, scores[:, 1:1])
 end

@@ -1,6 +1,12 @@
 import Random
 import Logging
 
+struct ThrowingOneHotReal <: Real end
+
+function NCPLS.decode_one_hot_indices(::Matrix{ThrowingOneHotReal})
+    throw(ErrorException("decode failed"))
+end
+
 @testset "fit_ncpls_core returns fitted arrays for matrices" begin
     model = NCPLS.NCPLSModel(
         ncomponents = 2,
@@ -455,6 +461,45 @@ end
         sampleclasses = sampleclasses,
         responselabels = ["A", "B", "trait"],
     )
+end
+
+@testset "class metadata validation rethrows unexpected decoder errors" begin
+    Y = fill(ThrowingOneHotReal(), 2, 2)
+
+    err = try
+        NCPLS.validate_class_response_metadata(Y, ["A", "B"], ["A", "B"])
+        nothing
+    catch err
+        err
+    end
+
+    @test err isa ErrorException
+    @test occursin("decode failed", sprint(showerror, err))
+end
+
+@testset "fit falls back to raw rank-deficient scores across repeated components" begin
+    model = NCPLS.NCPLSModel(
+        ncomponents = 2,
+        center_X = false,
+        scale_X = false,
+        center_Yprim = false,
+        multilinear = false,
+    )
+    X = reshape([1.0, 2.0, 3.0, 4.0], :, 1)
+    Y = Float64[
+        1 0
+        0 1
+        1 0
+        0 1
+    ]
+    Yadd = reshape([2.0, 4.0, 6.0, 8.0], :, 1)
+
+    full = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
+    light = NCPLS.fit_ncpls_light_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
+
+    @test full.T[:, 2] ≈ full.T[:, 1]
+    @test all(isfinite, full.B)
+    @test NCPLS.predict(light, X, 2) ≈ NCPLS.predict(full, X, 2)
 end
 
 @testset "fit stores multilinear mode weights and diagnostics" begin

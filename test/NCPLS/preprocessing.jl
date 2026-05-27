@@ -1,3 +1,5 @@
+import Statistics: mean
+
 @testset "float64 handles arrays and preserves Float64 storage" begin
     X_float = rand(3, 2)
     @test NCPLS.float64(X_float) === X_float
@@ -56,6 +58,22 @@ end
     @test_throws ArgumentError NCPLS.centerscale([1.0, 2.0, 3.0], true, true, nothing)
 end
 
+@testset "centerscale scales around an uncentered mean when centering is disabled" begin
+    X = Float64[
+        1 2
+        3 6
+        5 10
+    ]
+
+    X_scaled, μ, σ = NCPLS.centerscale(X, false, true, nothing)
+    μ0 = mean(X; dims = 1)
+    expected_σ = vec(sqrt.(sum((X .- μ0) .^ 2; dims = 1) / size(X, 1)))
+
+    @test μ == zeros(2)
+    @test σ ≈ expected_σ
+    @test X_scaled ≈ X ./ reshape(expected_σ, 1, :)
+end
+
 @testset "centerscale handles weighted tensors along sample dimension" begin
     X = Array{Float64}(undef, 4, 2, 2)
     X[:, 1, 1] = [1.0, 2.0, 3.0, 4.0]
@@ -79,6 +97,25 @@ end
     @test σ ≈ expected_σ
     @test sum(X_cs .* w, dims = 1) ./ wsum ≈ zeros(1, 2, 2) atol=1e-12
     @test sqrt.(sum(w .* X_cs .^ 2, dims = 1) / wsum) ≈ ones(1, 2, 2)
+end
+
+@testset "centerscale scales weighted tensors when centering is disabled" begin
+    X = reshape(collect(1.0:12.0), 3, 2, 2)
+    weights = [1.0, 2.0, 3.0]
+
+    X_scaled, μ, σ = NCPLS.centerscale(X, false, true, weights)
+
+    wsum = sum(weights)
+    w = reshape(weights, :, 1, 1)
+    μ0 = dropdims(sum(X .* w; dims = 1) / wsum; dims = 1)
+    expected_σ = dropdims(
+        sqrt.(sum(w .* (X .- reshape(μ0, 1, size(μ0)...)) .^ 2; dims = 1) / wsum);
+        dims = 1,
+    )
+
+    @test μ == zeros(size(μ))
+    @test σ ≈ expected_σ
+    @test X_scaled ≈ X ./ reshape(expected_σ, 1, size(expected_σ)...)
 end
 
 @testset "preprocess returns aligned arrays for matrices and tensors" begin

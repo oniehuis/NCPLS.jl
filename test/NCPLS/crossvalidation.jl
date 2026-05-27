@@ -159,6 +159,30 @@ end
     @test_throws MethodError NCPLS.sampleclasses(mf, preds)
 end
 
+@testset "classification helpers reject fits without class-response columns" begin
+    X = CROSSVAL_X_MATRIX[1:4, :]
+    Y = reshape([0.5, 1.0, 1.5, 2.0], :, 1)
+    mf = NCPLS.fit(
+        NCPLS.NCPLSModel(ncomponents = 1, multilinear = false),
+        X,
+        Y,
+    )
+    preds = NCPLS.predict(mf, X, 1)
+
+    err = try
+        NCPLS.onehot(mf, preds)
+        nothing
+    catch err
+        err
+    end
+
+    @test err isa ArgumentError
+    @test occursin(
+        "This fitted model does not define class-response columns",
+        sprint(showerror, err),
+    )
+end
+
 @testset "random_batch_indices builds stratified folds" begin
     strata = vcat(fill(1, 6), fill(2, 6))
     folds = NCPLS.random_batch_indices(strata, 3, MersenneTwister(1))
@@ -174,6 +198,64 @@ end
     @test_logs (:info, r"Stratum 1 .* not evenly divisible") begin
         NCPLS.random_batch_indices(uneven, 2, MersenneTwister(2))
     end
+end
+
+@testset "subset helpers accept total-sample, train-sample, and passthrough values" begin
+    train_indices = [4, 1]
+    n_samples = 4
+
+    total_vector = ["s1", "s2", "s3", "s4"]
+    train_vector = ["train4", "train1"]
+    @test NCPLS.subset_vector_like(nothing, train_indices, n_samples, :samplelabels) === nothing
+    @test NCPLS.subset_vector_like(total_vector, train_indices, n_samples, :samplelabels) ==
+        ["s4", "s1"]
+    @test NCPLS.subset_vector_like(train_vector, train_indices, n_samples, :samplelabels) ===
+        train_vector
+    @test NCPLS.subset_vector_like(:unchanged, train_indices, n_samples, :samplelabels) ===
+        :unchanged
+    @test_throws DimensionMismatch NCPLS.subset_vector_like(
+        ["too", "many", "or", "few", "values"],
+        train_indices,
+        n_samples,
+        :samplelabels,
+    )
+
+    total_matrix = reshape(collect(1:8), 4, 2)
+    train_matrix = [10 20; 30 40]
+    @test NCPLS.subset_matrix_like(nothing, train_indices, n_samples, :Yadd) === nothing
+    @test NCPLS.subset_matrix_like(total_matrix, train_indices, n_samples, :Yadd) ==
+        total_matrix[train_indices, :]
+    @test NCPLS.subset_matrix_like(train_matrix, train_indices, n_samples, :Yadd) ===
+        train_matrix
+    @test NCPLS.subset_matrix_like(total_vector, train_indices, n_samples, :Yadd) ==
+        ["s4", "s1"]
+    @test NCPLS.subset_matrix_like(:unchanged, train_indices, n_samples, :Yadd) ===
+        :unchanged
+    @test_throws DimensionMismatch NCPLS.subset_matrix_like(
+        reshape(collect(1:6), 3, 2),
+        train_indices,
+        n_samples,
+        :Yadd,
+    )
+end
+
+@testset "subset_fit_kwargs slices fold-local fit metadata" begin
+    train_indices = [3, 1]
+    fit_kwargs = (
+        obs_weights = [0.1, 0.2, 0.3],
+        samplelabels = ["s1", "s2", "s3"],
+        sampleclasses = ["A", "B", "A"],
+        Yadd = reshape(collect(1.0:6.0), 3, 2),
+        responselabels = ["A", "B"],
+    )
+
+    out = NCPLS.subset_fit_kwargs(fit_kwargs, train_indices, 3)
+
+    @test out.obs_weights == [0.3, 0.1]
+    @test out.samplelabels == ["s3", "s1"]
+    @test out.sampleclasses == ["A", "A"]
+    @test out.Yadd == fit_kwargs.Yadd[train_indices, :]
+    @test out.responselabels === fit_kwargs.responselabels
 end
 
 @testset "default callback bundles" begin
