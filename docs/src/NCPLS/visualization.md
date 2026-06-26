@@ -376,6 +376,39 @@ nothing # hide
 
 [Open the interactive weight profiles](visualization_weightprofiles.html)
 
+## Score Centers And Representatives
+
+`scorecenters` summarizes groups in score space. With a fitted model, the function uses
+the stored training scores, sample classes, and sample labels:
+
+```julia
+sc = scorecenters(mf_da; comps=1:2, center=:median)
+scorecenter(sc, "major")
+sampleindices(sc, "major")
+samplelabels(sc, "major")
+```
+
+The lower-level method accepts any score matrix, including projected scores for new
+samples:
+
+```julia
+heldout_scores = project(mf_da, Xheldout)
+sc = scorecenters(heldout_scores, heldout_classes;
+    samplelabels=heldout_labels,
+    comps=1:2,
+)
+```
+
+`scorerepresentatives` selects the samples closest to the corresponding class center in
+the selected score components. Distances are Euclidean.
+
+```julia
+sr = scorerepresentatives(mf_da; comps=1:2, center=:median, n=1)
+samplelabels(sr, "major")
+representativescores(sr, "major")
+representativedistances(sr, "major")
+```
+
 ## API
 
 - [`scoreplot`](@ref NCPLS.scoreplot)
@@ -385,3 +418,17 @@ nothing # hide
 - [`coefflandscapeplot`](@ref NCPLS.coefflandscapeplot)
 - [`weightprofiles`](@ref NCPLS.weightprofiles)
 - [`weightprofilesplot`](@ref NCPLS.weightprofilesplot)
+
+```@docs
+NCPLS.ScoreCenters
+NCPLS.ScoreRepresentatives
+NCPLS.scorecenters
+NCPLS.scorerepresentatives
+NCPLS.scorecenter
+NCPLS.sampleindices(::NCPLS.ScoreCenters, ::Any)
+NCPLS.samplelabels(::NCPLS.ScoreCenters, ::Any)
+NCPLS.sampleindices(::NCPLS.ScoreRepresentatives, ::Any)
+NCPLS.samplelabels(::NCPLS.ScoreRepresentatives, ::Any)
+NCPLS.representativescores
+NCPLS.representativedistances
+```
