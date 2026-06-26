@@ -29,6 +29,10 @@ end
     include(joinpath("NCPLS", "scoreplot.jl"))
 end
 
+@testset "NCPLS/scorecenters.jl" begin
+    include(joinpath("NCPLS", "scorecenters.jl"))
+end
+
 @testset "NCPLS/preprocessing.jl" begin
     include(joinpath("NCPLS", "preprocessing.jl"))
 end

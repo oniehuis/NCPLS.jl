@@ -16,6 +16,7 @@ include("NCPLS/fit.jl")
 include("NCPLS/fit_light.jl")
 include("NCPLS/landscape.jl")
 include("NCPLS/scoreplot.jl")
+include("NCPLS/scorecenters.jl")
 include("NCPLS/preprocessing.jl")
 include("NCPLS/predict.jl")
 include("NCPLS/crossvalidation.jl")
@@ -50,7 +51,15 @@ export random_batch_indices
 export residuals
 export responselabels
 export sampleclasses
+export sampleindices
 export samplelabels
+export ScoreCenters
+export ScoreRepresentatives
+export representativedistances
+export representativescores
+export scorecenter
+export scorecenters
+export scorerepresentatives
 export scoreplot
 export synthetic_multilinear_hybrid_data
 export cv_classification
