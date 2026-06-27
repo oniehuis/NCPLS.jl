@@ -21,6 +21,14 @@
     @test NCPLS.scorecenter(sc, "A") == [2.0, 12.0]
     @test NCPLS.scorecenter(sc, "B") == [11.0, 22.0]
     @test_throws KeyError NCPLS.scorecenter(sc, "C")
+
+    @test sprint(show, sc) ==
+        "ScoreCenters(classes=2, components=[1, 2], center=:median)"
+    @test sprint(show, MIME"text/plain"(), sc) ==
+        "ScoreCenters\n" *
+        "  classes: [\"A\", \"B\"]\n" *
+        "  components: [1, 2]\n" *
+        "  center: median"
 end
 
 @testset "scorecenters supports mean and selected components" begin
@@ -106,6 +114,7 @@ end
     @test_throws ArgumentError NCPLS.scorecenters(scores, ["A", "B"]; comps = Int[])
     @test_throws ArgumentError NCPLS.scorecenters(scores, ["A", "B"]; comps = 3)
     @test_throws ArgumentError NCPLS.scorecenters(scores, ["A", "B"]; center = :mode)
+    @test_throws ArgumentError NCPLS.scorecenter_values(scores, :mode)
 
     model = NCPLS.NCPLSModel(ncomponents = 2, multilinear = false)
     mf = NCPLS.NCPLSFit(
@@ -163,6 +172,29 @@ end
     @test NCPLS.scorecenters(sr) === sr.centers
     @test NCPLS.scorecenter(sr, "B") == [10.0, 22.0]
     @test NCPLS.sampleindices(sr, "B") == [5, 4]
+    @test_throws KeyError NCPLS.sampleindices(sr, "C")
+
+    @test sprint(show, sr) ==
+        "ScoreRepresentatives(classes=2, representatives=2, components=[1, 2], center=:median)"
+    @test sprint(show, MIME"text/plain"(), sr) ==
+        "ScoreRepresentatives\n" *
+        "  classes: [\"A\", \"B\"]\n" *
+        "  representatives per class: [2, 2]\n" *
+        "  components: [1, 2]\n" *
+        "  center: median"
+
+    sr_empty = NCPLS.ScoreRepresentatives(
+        String[],
+        Vector{Int}[],
+        Vector{String}[],
+        Matrix{Float64}[],
+        Vector{Float64}[],
+        nothing,
+        [1],
+        :mean,
+    )
+    @test sprint(show, sr_empty) ==
+        "ScoreRepresentatives(classes=0, representatives=0, components=[1], center=:mean)"
 end
 
 @testset "scorerepresentatives accepts projected scores and subset components" begin
