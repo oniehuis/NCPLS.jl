@@ -15,10 +15,10 @@ three-dimensional array with one component slice rather than a plain matrix.
 
 For classification-capable fits, NCPLS provides two decoding layers on top of `predict`:
 
-- `onehot(mf, Xnew, A)` or `onehot(mf, predictions)` converts the final requested
-  component slice to a one-hot class matrix.
-- `predictclasses(mf, Xnew, A)` or `predictclasses(mf, predictions)` maps those class
-  scores back to class labels.
+- `onehot(mf, Xnew, A)` and `predictclasses(mf, Xnew, A)` take predictor data, call
+  `predict` internally, and return hard class assignments.
+- `decodeonehot(mf, predictions)` and `decodeclasses(mf, predictions)` decode an
+  already-computed prediction tensor.
 
 For mixed response blocks such as `[class indicators | continuous traits]`, `predict`
 still returns the full numeric response block, while `onehot` and `predictclasses`
@@ -212,18 +212,20 @@ components.
 ## Decoding Class Predictions
 
 For discriminant models, the raw output of `predict` remains numeric: it is a tensor of
-class scores, not a vector of labels. Use [`onehot`](@ref) when you want a one-hot class
-matrix and [`predictclasses`](@ref) when you want decoded class labels.
+class scores, not a vector of labels. Use [`onehot`](@ref) or [`predictclasses`](@ref)
+when you want to classify predictor data directly, and [`decodeonehot`](@ref) or
+[`decodeclasses`](@ref) when you already have the output of `predict`.
 
 ```@docs
 NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real}, ::Integer)
-NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3})
+NCPLS.decodeonehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3})
 NCPLS.predictclasses
+NCPLS.decodeclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3})
 ```
 
 ```@example predict_examples
 Yhat_da = predict(mf_da, X_holdout, 2)
-predicted_da = predictclasses(mf_da, Yhat_da)
+predicted_da = decodeclasses(mf_da, Yhat_da)
 tensor_size=size(Yhat_da)
 ```
 
@@ -236,7 +238,7 @@ hcat(labels_holdout, classes_holdout, predicted_da)
 ```
 
 The final requested component slice is `Yhat_da[:, end, :]`. If you prefer one-hot class
-assignments instead of labels, use `onehot(mf_da, Yhat_da)` or the convenience wrapper
+assignments instead of labels, use `decodeonehot(mf_da, Yhat_da)` or the convenience wrapper
 `onehot(mf_da, X_holdout, 2)`.
 
 ## Hybrid Response Blocks
@@ -259,8 +261,8 @@ mf_hybrid = fit(
 )
 
 Yhat_hybrid = predict(mf_hybrid, X_holdout, 2)
-predicted_hybrid_classes = predictclasses(mf_hybrid, Yhat_hybrid)
-predicted_hybrid_onehot = onehot(mf_hybrid, Yhat_hybrid)
+predicted_hybrid_classes = decodeclasses(mf_hybrid, Yhat_hybrid)
+predicted_hybrid_onehot = decodeonehot(mf_hybrid, Yhat_hybrid)
 predicted_hybrid_traits = @view Yhat_hybrid[:, end, data.regressioncols]
 
 (;
@@ -285,13 +287,13 @@ This illustrates the main downstream pattern for hybrid responses:
 
 ```julia
 Yhat = predict(mf_hybrid, Xnew, 2)
-class_labels = predictclasses(mf_hybrid, Yhat)
-class_onehot = onehot(mf_hybrid, Yhat)
+class_labels = decodeclasses(mf_hybrid, Yhat)
+class_onehot = decodeonehot(mf_hybrid, Yhat)
 continuous_cols = data.regressioncols
 continuous_targets = Yhat[:, end, continuous_cols]
 ```
 
-`predict` keeps the full response block intact, while `predictclasses` and `onehot`
+`predict` keeps the full response block intact, while `decodeclasses` and `decodeonehot`
 decode only the inferred class-response columns.
 
 ## API
@@ -299,6 +301,6 @@ decode only the inferred class-response columns.
 - [`project`](@ref NCPLS.project)
 - [`predict`](@ref StatsAPI.predict)
 - [`onehot(mf, X, ncomps)`](@ref NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real}, ::Integer))
-- [`onehot(mf, predictions)`](@ref NCPLS.onehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3}))
+- [`decodeonehot(mf, predictions)`](@ref NCPLS.decodeonehot(::NCPLS.AbstractNCPLSFit, ::AbstractArray{<:Real,3}))
 - [`predictclasses(mf, X, ncomps)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real}, ::Integer))
-- [`predictclasses(mf, predictions)`](@ref NCPLS.predictclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3}))
+- [`decodeclasses(mf, predictions)`](@ref NCPLS.decodeclasses(::NCPLS.NCPLSFit, ::AbstractArray{<:Real,3}))

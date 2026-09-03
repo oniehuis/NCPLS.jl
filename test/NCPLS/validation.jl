@@ -672,7 +672,7 @@ end
         predictoraxes = data.predictoraxes,
     )
     Yhat_hybrid = NCPLS.predict(mf_hybrid, data.X, 2)
-    pred_hybrid = NCPLS.predictclasses(mf_hybrid, Yhat_hybrid)
+    pred_hybrid = NCPLS.decodeclasses(mf_hybrid, Yhat_hybrid)
     @test size(Yhat_hybrid) == (size(data.X, 1), 2, size(data.Yprim_hybrid, 2))
     @test mean(pred_hybrid .== data.sampleclasses_string) ≥ 0.80
     @test all(

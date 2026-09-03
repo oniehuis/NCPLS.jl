@@ -121,9 +121,25 @@ end
         expected[i, cls] = 1
     end
 
-    @test NCPLS.onehot(mf, preds) == expected
+    @test NCPLS.decodeonehot(mf, preds) == expected
     @test NCPLS.onehot(mf, CROSSVAL_X_MATRIX, 2) == expected
-    @test NCPLS.predictclasses(mf, preds) == NCPLS.responselabels(mf)[NCPLS.sampleclasses(expected)]
+    @test NCPLS.decodeclasses(mf, preds) == NCPLS.responselabels(mf)[NCPLS.sampleclasses(expected)]
+end
+
+@testset "classification helpers require explicit components for tensor predictors" begin
+    mf = NCPLS.fit(
+        NCPLSModel(ncomponents = 2, multilinear = false),
+        CROSSVAL_X_TENSOR,
+        CROSSVAL_Y;
+        responselabels = ["A", "B"],
+    )
+
+    preds = NCPLS.predict(mf, CROSSVAL_X_TENSOR, 2)
+
+    @test_throws MethodError NCPLS.onehot(mf, CROSSVAL_X_TENSOR)
+    @test_throws MethodError NCPLS.predictclasses(mf, CROSSVAL_X_TENSOR)
+    @test NCPLS.onehot(mf, CROSSVAL_X_TENSOR, 2) == NCPLS.decodeonehot(mf, preds)
+    @test NCPLS.predictclasses(mf, CROSSVAL_X_TENSOR, 2) == NCPLS.decodeclasses(mf, preds)
 end
 
 @testset "classification helpers isolate class columns in mixed response fits" begin
@@ -154,8 +170,8 @@ end
         0 1
     ]
 
-    @test NCPLS.onehot(mf, preds) == expected
-    @test NCPLS.predictclasses(mf, preds) == ["A", "B", "A", "B"]
+    @test NCPLS.decodeonehot(mf, preds) == expected
+    @test NCPLS.decodeclasses(mf, preds) == ["A", "B", "A", "B"]
     @test_throws MethodError NCPLS.sampleclasses(mf, preds)
 end
 
@@ -170,7 +186,7 @@ end
     preds = NCPLS.predict(mf, X, 1)
 
     err = try
-        NCPLS.onehot(mf, preds)
+        NCPLS.decodeonehot(mf, preds)
         nothing
     catch err
         err

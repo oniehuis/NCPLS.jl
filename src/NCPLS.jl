@@ -30,6 +30,8 @@ export coef
 export coefflandscape
 export coefflandscapeplot
 export coefficientlandscape
+export decodeclasses
+export decodeonehot
 export fit
 export fitted
 export invfreqweights

@@ -109,7 +109,7 @@ function pvalue(
 end
 
 """
-    onehot(mf::AbstractNCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
+    onehot(mf::AbstractNCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer)
 
 Generate one-hot predictions from a fitted NCPLS model. Unlike CPPLS, NCPLS stores
 cumulative predictions along the component axis, so the last requested component slice is
@@ -118,13 +118,13 @@ used directly.
 function onehot(
     mf::AbstractNCPLSFit,
     X::AbstractArray{<:Real},
-    ncomps::Integer=ncomponents(mf),
+    ncomps::Integer,
 )
-    onehot(mf, predict(mf, X, ncomps))
+    decodeonehot(mf, predict(mf, X, ncomps))
 end
 
 """
-    onehot(mf::AbstractNCPLSFit, predictions::AbstractArray{<:Real, 3})
+    decodeonehot(mf::AbstractNCPLSFit, predictions::AbstractArray{<:Real, 3})
 
 Convert NCPLS prediction tensors `(samples, components, responses)` into one-hot labels.
 For full `NCPLSFit` objects, NCPLS uses the inferred class-response block only, so mixed
@@ -132,7 +132,7 @@ response fits of the form `[class scores | continuous traits]` are supported. Th
 `NCPLSFitLight` fallback uses the full response block and is intended mainly for internal
 cross-validation helpers on pure classification responses.
 """
-function onehot(
+function decodeonehot(
     ::AbstractNCPLSFit,
     predictions::AbstractArray{<:Real, 3},
 )
@@ -160,7 +160,7 @@ function class_response_columns(mf::NCPLSFit)
     ))
 end
 
-function onehot(
+function decodeonehot(
     mf::NCPLSFit,
     predictions::AbstractArray{<:Real, 3},
 )
@@ -174,20 +174,26 @@ function onehot(
 end
 
 """
-    predictclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer=ncomponents(mf))
-    predictclasses(mf::NCPLSFit, predictions::AbstractArray{<:Real, 3})
+    predictclasses(mf::NCPLSFit, X::AbstractArray{<:Real}, ncomps::Integer)
 
-Map NCPLS predictions back to class labels using the inferred class-response block.
+Predict responses for `X` with `ncomps` components and map the class-score block back
+to class labels.
 """
 function predictclasses(
     mf::NCPLSFit,
     X::AbstractArray{<:Real},
-    ncomps::Integer=ncomponents(mf),
+    ncomps::Integer,
 )
-    predictclasses(mf, predict(mf, X, ncomps))
+    decodeclasses(mf, predict(mf, X, ncomps))
 end
 
-function predictclasses(
+"""
+    decodeclasses(mf::NCPLSFit, predictions::AbstractArray{<:Real, 3})
+
+Map an NCPLS prediction tensor back to class labels using the inferred class-response
+block.
+"""
+function decodeclasses(
     mf::NCPLSFit,
     predictions::AbstractArray{<:Real, 3},
 )
@@ -196,7 +202,7 @@ function predictclasses(
         "responselabels must be provided to map predictions to class labels"))
 
     classlabels = responselabels(mf)[classcols]
-    classlabels[sampleclasses(onehot(mf, predictions))]
+    classlabels[sampleclasses(decodeonehot(mf, predictions))]
 end
 
 """
