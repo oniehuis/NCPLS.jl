@@ -479,6 +479,15 @@ end
     @test all(data.obs_weights[data.clean_idx] .> minimum(data.obs_weights[data.noisy_idx]))
 end
 
+@testset "comparison_winner_weights covers winner branches" begin
+    @test NCPLS.comparison_winner_weights(1.0, 0.5; lower_is_better = true) == :with_weights
+    @test NCPLS.comparison_winner_weights(0.5, 1.0; lower_is_better = true) == :without_weights
+    @test NCPLS.comparison_winner_weights(1.0, 1.0; lower_is_better = true) == :tie
+    @test NCPLS.comparison_winner_weights(1.0, 2.0; lower_is_better = false) == :with_weights
+    @test NCPLS.comparison_winner_weights(2.0, 1.0; lower_is_better = false) == :without_weights
+    @test NCPLS.comparison_winner_weights(1.0, 1.0; lower_is_better = false) == :tie
+end
+
 @testset "compare_obs_weights_effect summarizes weighted versus unweighted NCPLS" begin
     data = NCPLS.synthetic_obs_weighted_multilinear_data(
         nsamples = 80,
@@ -521,8 +530,57 @@ end
     @test result.better_model_weighted_test_rmse[1] in (:without_weights, :with_weights, :tie)
     @test result.better_model_test_r2[1] in (:without_weights, :with_weights, :tie)
     @test result.better_model_weighted_test_r2[1] in (:without_weights, :with_weights, :tie)
-    @test result.with_weights.weighted_rmse_test_overall[1] ≤
-        result.without_weights.weighted_rmse_test_overall[1] + 1e-10
+    @test result.rmse_test_delta[1] ≈
+        result.with_weights.rmse_test_overall[1] -
+        result.without_weights.rmse_test_overall[1]
+    @test result.weighted_rmse_test_delta[1] ≈
+        result.with_weights.weighted_rmse_test_overall[1] -
+        result.without_weights.weighted_rmse_test_overall[1]
+    @test result.r2_test_delta[1] ≈
+        result.with_weights.r2_test_overall[1] -
+        result.without_weights.r2_test_overall[1]
+    @test result.weighted_r2_test_delta[1] ≈
+        result.with_weights.weighted_r2_test_overall[1] -
+        result.without_weights.weighted_r2_test_overall[1]
+    @test result.better_model_test_rmse[1] == NCPLS.comparison_winner_weights(
+        result.without_weights.rmse_test_overall[1],
+        result.with_weights.rmse_test_overall[1];
+        lower_is_better = true,
+    )
+    @test result.better_model_weighted_test_rmse[1] == NCPLS.comparison_winner_weights(
+        result.without_weights.weighted_rmse_test_overall[1],
+        result.with_weights.weighted_rmse_test_overall[1];
+        lower_is_better = true,
+    )
+    @test result.better_model_test_r2[1] == NCPLS.comparison_winner_weights(
+        result.without_weights.r2_test_overall[1],
+        result.with_weights.r2_test_overall[1];
+        lower_is_better = false,
+    )
+    @test result.better_model_weighted_test_r2[1] == NCPLS.comparison_winner_weights(
+        result.without_weights.weighted_r2_test_overall[1],
+        result.with_weights.weighted_r2_test_overall[1];
+        lower_is_better = false,
+    )
+
+    unfolded = NCPLS.compare_obs_weights_effect(
+        data;
+        ncomponents = 1,
+        multilinear = false,
+        test_fraction = 0.25,
+        rng = Random.MersenneTwister(41),
+    )
+
+    @test unfolded.common_ncomponents == 1
+    @test unfolded.without_mode_abs_cor === nothing
+    @test unfolded.with_mode_abs_cor === nothing
+    @test unfolded.true_active_mz_channels === nothing
+    @test unfolded.without_recovered_top_mz === nothing
+    @test unfolded.with_recovered_top_mz === nothing
+    @test unfolded.without_mz_overlap === nothing
+    @test unfolded.with_mz_overlap === nothing
+    @test length(unfolded.without_weights.weighted_rmse_test_overall) == 1
+    @test length(unfolded.with_weights.weighted_rmse_test_overall) == 1
 end
 
 @testset "assess_multilinear_stress summarizes init and convergence under harder regimes" begin
