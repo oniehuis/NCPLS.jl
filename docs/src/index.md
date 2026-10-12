@@ -11,18 +11,15 @@ incorporates the "power" parameter extension outlined by Indahl (2009) and Lilan
 
 ## Installation
 
-The package is currently unregistered, so install it directly from GitHub:
+Julia 1.9 or later is required. Install the development version from GitHub in
+your Julia environment:
 
 ```julia
-julia> ]
-pkg> add https://github.com/oniehuis/NCPLS.jl
+using Pkg
+Pkg.add(url="https://github.com/oniehuis/NCPLS.jl", rev="main")
 ```
 
-Then load it with:
-
-```julia
-julia> using NCPLS
-```
+Then load the package with `using NCPLS`.
 
 ## Scope
 
@@ -42,6 +39,14 @@ helpers target categorical labels or pure one-hot class-indicator matrices; hybr
 workflows rely on the more general nested cross-validation functions with custom callbacks.
 
 ## Quick Start
+
+The example below includes a Makie score plot. Install CairoMakie in the same
+Julia environment before running it:
+
+```julia
+using Pkg
+Pkg.add("CairoMakie")
+```
 
 ```@example quickstart
 using NCPLS
