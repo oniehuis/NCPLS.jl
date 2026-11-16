@@ -50,6 +50,11 @@ iteration progress from the PARAFAC step is printed when `m.multilinear` is enab
 The return value is a `NCPLSFit` containing scores, loadings, regression coefficients,
 and the metadata needed for downstream prediction and diagnostics. Use `NCPLS.fit` or
 `StatsAPI.fit` when disambiguation is required in your namespace.
+
+Fitting throws an `ArgumentError` identifying the component if candidate scores or the
+final score vector have no numerically usable direction after orthogonalization against
+earlier scores. Reduce `ncomponents` in that case; a successful fit always contains the
+requested number of components.
 """
 function fit(
     m::NCPLSModel,
@@ -277,17 +282,11 @@ function fit_ncpls_core(
         selectdim(W0, ndims(W0), i) .= W₀
 
         # Form candidate scores for the supervised CCA step. When Yadd is present,
-        # the manuscript orthogonalizes these scores on previous components. For
-        # rank-deficient toy cases that orthogonalization can collapse to numerical
-        # zero on some BLAS/LAPACK combinations, so fall back to the raw candidate
-        # scores when that happens.
-        Z₀_raw = candidate_scores(d.X, W₀)
-        Z₀ = Z₀_raw
+        # the manuscript orthogonalizes these scores on previous components.
+        # Reject exhaustion before CCA can amplify numerical residuals.
+        Z₀ = candidate_scores(d.X, W₀)
         if !isnothing(d.Yadd)
-            Z₀ = orthogonalize_on_accumulated_scores(Z₀, T[:, 1:i-1])
-            if norm(Z₀) ≤ sqrt(eps(Float64)) * max(norm(Z₀_raw), 1.0)
-                Z₀ = Z₀_raw
-            end
+            Z₀ = independent_component_scores(Z₀, T[:, 1:i-1], i)
         end
 
         # C ⇐ canoncorr(Z₀, Y)
@@ -320,14 +319,9 @@ function fit_ncpls_core(
         selectdim(W_A, ndims(W_A), i) .= Wᵒ
 
         # Form the score vector and orthogonalize it on previous components.
-        # In rank-deficient toy cases the orthogonalized vector can collapse to
-        # numerical zero; fall back to the raw score direction in that case so
-        # component extraction remains well-defined across Julia versions.
+        # A dependent direction cannot define another component.
         t_raw = score_vector(d.X, Wᵒ)
-        t = orthogonalize_on_accumulated_scores(t_raw, T[:, 1:i-1])
-        if norm(t) ≤ sqrt(eps(Float64)) * max(norm(t_raw), 1.0)
-            t = t_raw
-        end
+        t = independent_component_scores(t_raw, T[:, 1:i-1], i)
         t = normalize_vector(t)
         T[:, i] = t
 

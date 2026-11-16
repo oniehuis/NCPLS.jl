@@ -10,6 +10,13 @@ loading weights are represented:
 - `orthogonalize_mode_weights=true` optionally orthogonalizes the multilinear mode
   vectors across components.
 
+The requested `ncomponents` must be supported by numerically independent score
+directions. If the candidate scores or final score vector collapse after
+orthogonalization against earlier scores, fitting throws an `ArgumentError` naming the
+component that could not be extracted. Request fewer components in that case. Full and
+lightweight fitting use the same check, and successful fits contain exactly the requested
+number of components.
+
 !!! note
     The practical motivation for `obs_weights` and `Yadd` is the same as in the
     matrix-valued `CPPLS` workflow, so that discussion is not repeated in full here.

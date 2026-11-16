@@ -1,5 +1,6 @@
 import Random
 import Logging
+using LinearAlgebra: I
 
 struct ThrowingOneHotReal <: Real end
 
@@ -17,9 +18,9 @@ end
     )
     X = Float64[
         1 2
-        3 4
+        3 1
         5 6
-        7 8
+        7 4
     ]
     Y = Float64[
         1 0
@@ -70,14 +71,14 @@ end
         center_Yprim = true,
         multilinear = false,
     )
-    X = reshape(collect(1.0:24.0), 4, 3, 2)
+    X = randn(Random.MersenneTwister(12), 4, 3, 2)
     Y = Float64[
         1 0
         0 1
         1 0
         0 1
     ]
-    Yadd = reshape([10.0, 20.0, 10.0, 20.0], :, 1)
+    Yadd = reshape([10.0, 20.0, 30.0, 40.0], :, 1)
 
     d = NCPLS.preprocess(model, X, Y, Yadd, nothing)
     mf = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
@@ -477,15 +478,10 @@ end
     @test occursin("decode failed", sprint(showerror, err))
 end
 
-@testset "fit falls back to raw rank-deficient scores across repeated components" begin
-    model = NCPLS.NCPLSModel(
-        ncomponents = 2,
-        center_X = false,
-        scale_X = false,
-        center_Yprim = false,
-        multilinear = false,
-    )
-    X = reshape([1.0, 2.0, 3.0, 4.0], :, 1)
+@testset "fit rejects exhausted independent score directions" begin
+    x = [1.0, 2.0, 3.0, 4.0]
+    X_rank1 = reshape(x, :, 1)
+    X_near_rank1 = hcat(x, x + 1e-12 * [1, -1, -1, 1])
     Y = Float64[
         1 0
         0 1
@@ -494,12 +490,81 @@ end
     ]
     Yadd = reshape([2.0, 4.0, 6.0, 8.0], :, 1)
 
-    full = NCPLS.fit_ncpls_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
-    light = NCPLS.fit_ncpls_light_core(model, X, Y; Yadd = Yadd, obs_weights = nothing)
+    @testset "multilinear=$multilinear, Yadd=$(additional !== nothing)" for
+        multilinear in (false, true), additional in (nothing, Yadd)
 
-    @test full.T[:, 2] ≈ full.T[:, 1]
-    @test all(isfinite, full.B)
-    @test NCPLS.predict(light, X, 2) ≈ NCPLS.predict(full, X, 2)
+        # With Yadd, exhaustion is detected before CCA. Without it, nonuniform
+        # weights keep the raw candidates nonzero after response deflation, so
+        # the final score check must reject the dependent direction from CCA.
+        obs_weights = isnothing(additional) ? [1.0, 2.0, 1.0, 2.0] : nothing
+        @testset "size=$(size(X))" for X in
+            (X_rank1, X_near_rank1, reshape(X_rank1, 4, 1, 1))
+
+            model1 = NCPLS.NCPLSModel(
+                ncomponents = 1,
+                center_X = false,
+                scale_X = false,
+                center_Yprim = false,
+                multilinear = multilinear,
+            )
+            model2 = NCPLS.with_n_components(model1, 2)
+            full = NCPLS.fit(model1, X, Y; Yadd = additional, obs_weights = obs_weights)
+            light = NCPLS.fit_ncpls_light(model1, X, Y; Yadd = additional,
+                obs_weights = obs_weights)
+
+            @test full.T' * full.T ≈ ones(1, 1) atol = 1e-12
+            @test NCPLS.project(full, X) ≈ full.T atol = 1e-12
+            @test NCPLS.predict(light, X) ≈ NCPLS.predict(full, X)
+
+            for fitfn in (NCPLS.fit, NCPLS.fit_ncpls_light)
+                err = try
+                    fitfn(model2, X, Y; Yadd = additional, obs_weights = obs_weights)
+                    nothing
+                catch err
+                    err
+                end
+                @test err isa ArgumentError
+                @test occursin("component 2", sprint(showerror, err))
+                @test occursin("no numerically independent score direction", sprint(showerror, err))
+                @test occursin("ncomponents", sprint(showerror, err))
+            end
+        end
+    end
+end
+
+@testset "valid fits preserve score and prediction invariants" begin
+    rng = Random.MersenneTwister(42)
+    X_tensor = randn(rng, 12, 3, 2)
+    Y = randn(rng, 12, 2)
+    Yadd = randn(rng, 12, 1)
+    weights = collect(range(0.5, 2.0; length = 12))
+
+    @testset "multilinear=$multilinear, Yadd=$(additional !== nothing), weighted=$(obs_weights !== nothing), size=$(size(X))" for
+        multilinear in (false, true), additional in (nothing, Yadd),
+        obs_weights in (nothing, weights), X in (reshape(X_tensor, 12, :), X_tensor)
+
+        model = NCPLS.NCPLSModel(
+            ncomponents = 2,
+            center_X = true,
+            scale_X = true,
+            center_Yprim = true,
+            multilinear = multilinear,
+        )
+        full = NCPLS.fit(model, X, Y; Yadd = additional, obs_weights = obs_weights)
+        light = NCPLS.fit_ncpls_light(model, X, Y; Yadd = additional, obs_weights = obs_weights)
+        one = NCPLS.fit(NCPLS.with_n_components(model, 1), X, Y;
+            Yadd = additional, obs_weights = obs_weights)
+
+        @test NCPLS.ncomponents(full) == NCPLS.ncomponents(light) == 2
+        @test full.T' * full.T ≈ Matrix{Float64}(I, 2, 2) atol = 1e-12
+        @test NCPLS.project(full, X) ≈ full.T atol = 1e-12
+        @test NCPLS.predict(full, X, 1) ≈ NCPLS.predict(one, X) atol = 1e-12
+        @test NCPLS.predict(light, X) ≈ NCPLS.predict(full, X) atol = 1e-12
+        # Earlier-component predictions must also remain unchanged for new data.
+        Xnew = X .+ 0.25
+        @test NCPLS.predict(full, Xnew, 1) ≈ NCPLS.predict(one, Xnew) atol = 1e-12
+        @test NCPLS.predict(light, Xnew) ≈ NCPLS.predict(full, Xnew) atol = 1e-12
+    end
 end
 
 @testset "fit stores multilinear mode weights and diagnostics" begin
@@ -511,7 +576,7 @@ end
         multilinear = true,
         orthogonalize_mode_weights = false,
     )
-    X = reshape(collect(1.0:24.0), 4, 3, 2)
+    X = randn(Random.MersenneTwister(12), 4, 3, 2)
     Y = Float64[
         1 0
         0 1

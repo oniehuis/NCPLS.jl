@@ -17,6 +17,9 @@ Low-level NCPLS fitting routine used by internal cross-validation helpers that r
 `NCPLSFitLight`. The keyword interface mirrors [`fit`](@ref) for compatibility with
 fold-local cross-validation kwargs, but the reduced fit stores only prediction-critical
 state.
+
+Like [`fit`](@ref), this routine throws an `ArgumentError` when orthogonalization leaves
+no numerically independent score direction for a requested component.
 """
 function fit_ncpls_light(
     m::NCPLSModel,
@@ -90,13 +93,9 @@ function fit_ncpls_light_core(
         Ycomb = isnothing(d.Yadd) ? Y : hcat(Y, d.Yadd)
         W₀ = candidate_loading_weights(d.X, Ycomb, obs_weights)
 
-        Z₀_raw = candidate_scores(d.X, W₀)
-        Z₀ = Z₀_raw
+        Z₀ = candidate_scores(d.X, W₀)
         if !isnothing(d.Yadd)
-            Z₀ = orthogonalize_on_accumulated_scores(Z₀, T[:, 1:i-1])
-            if norm(Z₀) ≤ sqrt(eps(Float64)) * max(norm(Z₀_raw), 1.0)
-                Z₀ = Z₀_raw
-            end
+            Z₀ = independent_component_scores(Z₀, T[:, 1:i-1], i)
         end
 
         C, _, _ = cca_coeffs_and_corr(Z₀, Y, cca_obs_weights)
@@ -118,10 +117,7 @@ function fit_ncpls_light_core(
         selectdim(W_A, ndims(W_A), i) .= Wᵒ
 
         t_raw = score_vector(d.X, Wᵒ)
-        t = orthogonalize_on_accumulated_scores(t_raw, T[:, 1:i-1])
-        if norm(t) ≤ sqrt(eps(Float64)) * max(norm(t_raw), 1.0)
-            t = t_raw
-        end
+        t = independent_component_scores(t_raw, T[:, 1:i-1], i)
         t = normalize_vector(t)
         T[:, i] = t
 

@@ -79,6 +79,22 @@ function orthogonalize_on_accumulated_scores(
     X - T_A * (T_A' * X)
 end
 
+# Fitting must reject numerical exhaustion before CCA or score normalization can
+# amplify roundoff into a spurious component. Use the same check in both fit paths.
+function independent_component_scores(
+    raw_scores::AbstractVecOrMat{Float64},
+    T_A::AbstractMatrix{Float64},
+    component::Integer,
+)
+    scores = orthogonalize_on_accumulated_scores(raw_scores, T_A)
+    if norm(scores) ≤ sqrt(eps(Float64)) * max(norm(raw_scores), 1.0)
+        throw(ArgumentError(
+            "Cannot extract component $component: no numerically independent score " *
+            "direction remains. Reduce ncomponents or check the data."))
+    end
+    scores
+end
+
 """
     loading_weights(
         W₀::AbstractArray{<:Real},
