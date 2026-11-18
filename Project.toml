@@ -1,6 +1,6 @@
 name = "NCPLS"
 uuid = "827487cb-15ea-44c0-9db5-fc2906c46261"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Oliver Niehuis <oliver.niehuis@biologie.uni-freiburg.de>"]
 
 [deps]
