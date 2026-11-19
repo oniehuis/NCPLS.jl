@@ -36,15 +36,31 @@ loading weights along the original predictor axes.
 
 ## Installation
 
-Julia 1.9 or later is required. Install the development version from GitHub in
-your Julia environment:
+Julia 1.9 or later is required. NCPLS is not registered in Julia's General
+registry; install it from GitHub.
+
+### Released version (recommended)
+
+Install `v0.1.0`, or replace `rev` with the tag from the
+[latest release page](https://github.com/oniehuis/NCPLS.jl/releases/latest):
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/oniehuis/NCPLS.jl", rev="v0.1.0")
+```
+
+### Development version
+
+Install the latest commit on `main`, which may include unreleased changes:
 
 ```julia
 using Pkg
 Pkg.add(url="https://github.com/oniehuis/NCPLS.jl", rev="main")
 ```
 
-Then load the package with `using NCPLS`.
+See the [installation guide](docs/src/index.md#installation) for updating and
+reproducibility. Use the [stable documentation][docs-stable-url] for the latest
+release and the [development documentation][docs-dev-url] for `main`.
 
 ## Quickstart
 

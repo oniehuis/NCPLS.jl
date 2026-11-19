@@ -11,15 +11,54 @@ incorporates the "power" parameter extension outlined by Indahl (2009) and Lilan
 
 ## Installation
 
-Julia 1.9 or later is required. Install the development version from GitHub in
-your Julia environment:
+Julia 1.9 or later is required. NCPLS is not registered in Julia's General
+registry; install it from GitHub in your active Julia environment.
+
+### Released version (recommended)
+
+Use a tagged release for research analyses. The example below installs `v0.1.0`.
+To install the latest published release, check the
+[latest release page](https://github.com/oniehuis/NCPLS.jl/releases/latest) and
+use its tag as `rev`:
+
+```julia
+using Pkg
+Pkg.add(url="https://github.com/oniehuis/NCPLS.jl", rev="v0.1.0")
+```
+
+This selects that release and does not automatically switch to newer releases.
+To switch releases, repeat the command with the desired tag.
+
+### Development version
+
+To try the latest development code, install the current commit on `main`:
 
 ```julia
 using Pkg
 Pkg.add(url="https://github.com/oniehuis/NCPLS.jl", rev="main")
 ```
 
-Then load the package with `using NCPLS`.
+`main` can contain changes made after the latest release. It is a moving branch,
+not an alias for the latest release. To fetch subsequent changes for an installation
+that tracks `main`, run:
+
+```julia
+using Pkg
+Pkg.update("NCPLS")
+```
+
+Check which tag or branch your environment tracks with `Pkg.status(["NCPLS"])`.
+Several development commits can share the same development version number.
+Keep your analysis project's `Project.toml` and `Manifest.toml` to record its
+package versions and exact source revisions.
+
+Use the [stable documentation](https://oniehuis.github.io/NCPLS.jl/stable/) for
+the latest release, the [v0.1.0 documentation](https://oniehuis.github.io/NCPLS.jl/v0.1.0/)
+for that specific release, and the [dev documentation](https://oniehuis.github.io/NCPLS.jl/dev/)
+for `main`. Documentation updates appear after a successful deployment.
+
+Load the package with `using NCPLS`. If it was already loaded before updating
+or switching versions, restart Julia first.
 
 ## Scope
 
